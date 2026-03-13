@@ -4,7 +4,7 @@ from datetime import datetime
 db = SQLAlchemy()
 
 ACADEMIAS = ['PREPATOP', 'PREPARASECUNDARIA', 'PREPARAANDALUCIA']
-ESTADOS = ['nuevo', 'contactado', 'interesado', 'matriculado', 'perdido']
+ESTADOS = ['nuevo', 'contactado', 'no_coge', 'interesado', 'a_espera_de_pago', 'matriculado', 'perdido']
 TIPOS_NOTA = ['llamada', 'email', 'reunion', 'otro']
 MODALIDADES = ['presencial', 'online', 'mixta']
 ESTADOS_PAGO = ['pendiente', 'parcial', 'completo']

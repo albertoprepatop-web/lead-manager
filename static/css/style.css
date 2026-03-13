@@ -96,7 +96,9 @@ body { background: #f0f2f5; font-size: 0.9rem; }
 
 .pipeline-nuevo { background: #6366F1; }
 .pipeline-contactado { background: #0EA5E9; }
+.pipeline-no_coge { background: #F97316; }
 .pipeline-interesado { background: #F59E0B; color: #000; }
+.pipeline-a_espera_de_pago { background: #8B5CF6; }
 .pipeline-matriculado { background: #16A34A; }
 .pipeline-perdido { background: #DC2626; }
 

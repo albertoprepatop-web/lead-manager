@@ -226,13 +226,101 @@ def update_lead(lead_id):
     if 'estado' in data:
         if data['estado'] not in ESTADOS:
             return jsonify({'error': f'Estado no valido'}), 400
-        lead.estado = data['estado']
+        old_estado = lead.estado
+        new_estado = data['estado']
+        lead.estado = new_estado
+
+        # Auto-create follow-up when contacted (remind in 3 days)
+        if new_estado == 'contactado' and old_estado != 'contactado':
+            seg = Seguimiento(
+                lead_id=lead.id,
+                fecha=datetime.utcnow() + timedelta(days=3),
+                nota='Recordatorio: volver a contactar (3 dias desde ultimo contacto)',
+                completado=False,
+            )
+            db.session.add(seg)
+            nota = NotaActividad(
+                lead_id=lead.id,
+                contenido=f'Estado cambiado a: Contactado',
+                tipo='llamada',
+            )
+            db.session.add(nota)
+
+        # Log no_coge
+        elif new_estado == 'no_coge':
+            nota = NotaActividad(
+                lead_id=lead.id,
+                contenido='Llamado - No coge el telefono',
+                tipo='llamada',
+            )
+            db.session.add(nota)
+            seg = Seguimiento(
+                lead_id=lead.id,
+                fecha=datetime.utcnow() + timedelta(days=2),
+                nota='Recordatorio: volver a llamar (no cogio la ultima vez)',
+                completado=False,
+            )
+            db.session.add(seg)
+
+        # Log a_espera_de_pago
+        elif new_estado == 'a_espera_de_pago':
+            nota = NotaActividad(
+                lead_id=lead.id,
+                contenido='Lead interesado - A espera de pago',
+                tipo='otro',
+            )
+            db.session.add(nota)
+
+        # Other state changes
+        elif new_estado != old_estado:
+            nota = NotaActividad(
+                lead_id=lead.id,
+                contenido=f'Estado cambiado de {old_estado} a {new_estado}',
+                tipo='otro',
+            )
+            db.session.add(nota)
+
     if 'notas' in data:
         lead.notas = data['notas']
 
     lead.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify(lead.to_dict())
+
+
+@app.route('/api/leads/<int:lead_id>/pagado', methods=['POST'])
+@login_required
+def marcar_pagado(lead_id):
+    """Mark lead as paid and auto-enroll as student."""
+    lead = Lead.query.get_or_404(lead_id)
+    data = request.get_json() or {}
+
+    alumno = Alumno(
+        nombre=lead.nombre,
+        telefono=lead.telefono,
+        email=lead.email,
+        academia=lead.academia,
+        fecha_matricula=datetime.utcnow(),
+        curso=data.get('curso', ''),
+        modalidad=data.get('modalidad', 'presencial'),
+        estado_pago='completo',
+        notas=data.get('notas', ''),
+        lead_id=lead.id,
+    )
+    db.session.add(alumno)
+
+    lead.estado = 'matriculado'
+    lead.updated_at = datetime.utcnow()
+
+    nota = NotaActividad(
+        lead_id=lead.id,
+        contenido=f'PAGADO - Matriculado automaticamente. Curso: {alumno.curso}, Modalidad: {alumno.modalidad}',
+        tipo='otro',
+    )
+    db.session.add(nota)
+
+    db.session.commit()
+    return jsonify({'lead': lead.to_dict(), 'alumno': alumno.to_dict()}), 201
 
 
 @app.route('/api/leads/<int:lead_id>', methods=['DELETE'])

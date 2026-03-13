@@ -161,7 +161,9 @@
                                 <option value="">Todos</option>
                                 <option value="nuevo">Nuevo</option>
                                 <option value="contactado">Contactado</option>
+                                <option value="no_coge">No Coge</option>
                                 <option value="interesado">Interesado</option>
+                                <option value="a_espera_de_pago">A Espera de Pago</option>
                                 <option value="matriculado">Matriculado</option>
                                 <option value="perdido">Perdido</option>
                             </select>
@@ -213,9 +215,19 @@
                          ondragover="event.preventDefault()" ondrop="dropLead(event, 'contactado')"></div>
                 </div>
                 <div class="col pipeline-col">
+                    <div class="pipeline-header pipeline-no_coge">No Coge</div>
+                    <div class="pipeline-body" id="pipeline-no_coge" data-estado="no_coge"
+                         ondragover="event.preventDefault()" ondrop="dropLead(event, 'no_coge')"></div>
+                </div>
+                <div class="col pipeline-col">
                     <div class="pipeline-header pipeline-interesado">Interesado</div>
                     <div class="pipeline-body" id="pipeline-interesado" data-estado="interesado"
                          ondragover="event.preventDefault()" ondrop="dropLead(event, 'interesado')"></div>
+                </div>
+                <div class="col pipeline-col">
+                    <div class="pipeline-header pipeline-a_espera_de_pago">Espera Pago</div>
+                    <div class="pipeline-body" id="pipeline-a_espera_de_pago" data-estado="a_espera_de_pago"
+                         ondragover="event.preventDefault()" ondrop="dropLead(event, 'a_espera_de_pago')"></div>
                 </div>
                 <div class="col pipeline-col">
                     <div class="pipeline-header pipeline-matriculado">Matriculado</div>
@@ -304,13 +316,16 @@
                     <a id="detail-email" href="#" class="btn btn-sm btn-outline-primary"><i class="bi bi-envelope"></i> Email</a>
                     <button class="btn btn-sm btn-outline-warning" onclick="openSeguimientoModal()"><i class="bi bi-bell-plus"></i> Seguimiento</button>
                     <button class="btn btn-sm btn-success" id="btn-matricular" onclick="openMatriculaModal()"><i class="bi bi-person-check"></i> Matricular</button>
+                    <button class="btn btn-sm btn-info text-white" id="btn-pagado" onclick="openPagadoModal()"><i class="bi bi-cash-coin"></i> Pagado</button>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Estado</label>
                     <select class="form-select form-select-sm" id="detail-estado-select" onchange="changeLeadEstado()">
                         <option value="nuevo">Nuevo</option>
                         <option value="contactado">Contactado</option>
+                        <option value="no_coge">No Coge</option>
                         <option value="interesado">Interesado</option>
+                        <option value="a_espera_de_pago">A Espera de Pago</option>
                         <option value="matriculado">Matriculado</option>
                         <option value="perdido">Perdido</option>
                     </select>
@@ -539,6 +554,41 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-danger" id="btn-confirm-delete">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL PAGADO ═══════════════════ -->
+    <div class="modal fade" id="pagadoModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-cash-coin"></i> Marcar como Pagado</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">El lead pasara automaticamente a alumno matriculado.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Curso *</label>
+                        <input type="text" class="form-control" id="pagado-curso" placeholder="Ej: Oposiciones AGE A1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Modalidad</label>
+                        <select class="form-select" id="pagado-modalidad">
+                            <option value="presencial">Presencial</option>
+                            <option value="online">Online</option>
+                            <option value="mixta">Mixta</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="pagado-notas" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info text-white" onclick="marcarPagado()"><i class="bi bi-check-lg"></i> Confirmar Pago</button>
                 </div>
             </div>
         </div>

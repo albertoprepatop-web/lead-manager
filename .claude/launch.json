@@ -4,7 +4,7 @@
     {
       "name": "lead-manager",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["app.py"],
+      "runtimeArgs": ["/Users/albertoolmosdominguez/Desktop/lead-manager/app.py"],
       "port": 5000
     }
   ]

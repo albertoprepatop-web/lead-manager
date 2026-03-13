@@ -14,7 +14,9 @@ const ACADEMIA_COLORS = {
 const ESTADO_LABELS = {
     nuevo: 'Nuevo',
     contactado: 'Contactado',
+    no_coge: 'No Coge',
     interesado: 'Interesado',
+    a_espera_de_pago: 'Espera Pago',
     matriculado: 'Matriculado',
     perdido: 'Perdido',
 };
@@ -321,8 +323,9 @@ async function openLeadDetail(id) {
     document.getElementById('detail-email').href = `mailto:${lead.email}`;
     document.getElementById('detail-estado-select').value = lead.estado;
 
-    // Hide matricular button if already matriculated
+    // Hide matricular/pagado buttons based on state
     document.getElementById('btn-matricular').style.display = lead.estado === 'matriculado' ? 'none' : 'inline-block';
+    document.getElementById('btn-pagado').style.display = (lead.estado === 'a_espera_de_pago' || lead.estado === 'interesado') ? 'inline-block' : 'none';
 
     document.getElementById('detail-info').innerHTML = `
         <div class="mb-1"><i class="bi bi-telephone me-2"></i>${lead.telefono || '-'}</div>
@@ -370,6 +373,7 @@ async function openLeadDetail(id) {
 async function changeLeadEstado() {
     const estado = document.getElementById('detail-estado-select').value;
     await api(`/api/leads/${currentLeadId}`, { method: 'PUT', body: { estado } });
+    openLeadDetail(currentLeadId);
 }
 
 async function addNota() {
@@ -408,6 +412,33 @@ async function matricularLead() {
     bootstrap.Offcanvas.getInstance(document.getElementById('leadDetail'))?.hide();
 
     alert('Lead matriculado correctamente! Ahora aparece en la seccion Alumnos.');
+    refreshCurrentView();
+}
+
+// ── Pagado (auto-matriculacion) ──────────────────────────────────────────
+function openPagadoModal() {
+    document.getElementById('pagado-curso').value = '';
+    document.getElementById('pagado-modalidad').value = 'presencial';
+    document.getElementById('pagado-notas').value = '';
+    new bootstrap.Modal(document.getElementById('pagadoModal')).show();
+}
+
+async function marcarPagado() {
+    const curso = document.getElementById('pagado-curso').value.trim();
+    if (!curso) { alert('El curso es obligatorio'); return; }
+
+    const data = {
+        curso,
+        modalidad: document.getElementById('pagado-modalidad').value,
+        notas: document.getElementById('pagado-notas').value.trim(),
+    };
+
+    await api(`/api/leads/${currentLeadId}/pagado`, { method: 'POST', body: data });
+
+    bootstrap.Modal.getInstance(document.getElementById('pagadoModal')).hide();
+    bootstrap.Offcanvas.getInstance(document.getElementById('leadDetail'))?.hide();
+
+    alert('Pago registrado! El lead ha sido matriculado automaticamente.');
     refreshCurrentView();
 }
 
@@ -590,7 +621,7 @@ async function loadPipeline() {
         : `<i class="bi bi-kanban"></i> Pipeline de Ventas`;
 
     const leads = await api(`/api/leads${params}`);
-    const estados = ['nuevo', 'contactado', 'interesado', 'matriculado', 'perdido'];
+    const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'a_espera_de_pago', 'matriculado', 'perdido'];
 
     for (const estado of estados) {
         const container = document.getElementById(`pipeline-${estado}`);
