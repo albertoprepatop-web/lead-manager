@@ -271,13 +271,16 @@
                 </div>
             </div>
             <div class="d-flex justify-content-between mb-2">
-                <button class="btn btn-sm btn-outline-secondary" onclick="exportAlumnosCSV()"><i class="bi bi-download"></i> Exportar CSV</button>
+                <div>
+                    <button class="btn btn-sm btn-success" onclick="openNuevoAlumnoModal()"><i class="bi bi-plus-lg"></i> Nuevo Alumno</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="exportAlumnosCSV()"><i class="bi bi-download"></i> Exportar CSV</button>
+                </div>
                 <span class="text-muted" id="alumnos-count"></span>
             </div>
             <div class="card">
                 <div class="card-body p-0">
                     <table class="table table-hover table-sm mb-0">
-                        <thead><tr><th>Nombre</th><th>Telefono</th><th>Email</th><th>Academia</th><th>Curso</th><th>Modalidad</th><th>Pago</th><th>Fecha Matricula</th><th>Acciones</th></tr></thead>
+                        <thead><tr><th>Nombre</th><th>Telefono</th><th>Email</th><th>Academia</th><th>Especialidad</th><th>Curso</th><th>Modalidad</th><th>Pago</th><th>Fecha Matricula</th><th>Acciones</th></tr></thead>
                         <tbody id="alumnos-table"></tbody>
                     </table>
                 </div>
@@ -387,10 +390,16 @@
                     </div>
                     <div class="mb-3" id="lead-academia-group">
                         <label class="form-label">Academia *</label>
-                        <select class="form-select" id="lead-academia">
+                        <select class="form-select" id="lead-academia" onchange="updateEspecialidadOptions('lead')">
                             <option value="PREPATOP">PREPATOP</option>
                             <option value="PREPARASECUNDARIA">PREPARASECUNDARIA</option>
                             <option value="PREPARAANDALUCIA">PREPARAANDALUCIA</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="lead-especialidad-group">
+                        <label class="form-label">Especialidad</label>
+                        <select class="form-select" id="lead-especialidad">
+                            <option value="">Sin especialidad</option>
                         </select>
                     </div>
                     <div class="mb-3">
@@ -481,6 +490,12 @@
                         <label class="form-label">Email</label>
                         <input type="email" class="form-control" id="alumno-email">
                     </div>
+                    <div class="mb-3" id="alumno-especialidad-group">
+                        <label class="form-label">Especialidad</label>
+                        <select class="form-select" id="alumno-especialidad">
+                            <option value="">Sin especialidad</option>
+                        </select>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Curso</label>
                         <input type="text" class="form-control" id="alumno-curso">
@@ -509,6 +524,74 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="saveAlumno()">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL NUEVO ALUMNO ═══════════════════ -->
+    <div class="modal fade" id="nuevoAlumnoModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-plus"></i> Nuevo Alumno</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre *</label>
+                        <input type="text" class="form-control" id="nuevo-alumno-nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telefono</label>
+                        <input type="text" class="form-control" id="nuevo-alumno-telefono">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="nuevo-alumno-email">
+                    </div>
+                    <div class="mb-3" id="nuevo-alumno-academia-group">
+                        <label class="form-label">Academia *</label>
+                        <select class="form-select" id="nuevo-alumno-academia" onchange="updateEspecialidadOptions('nuevo-alumno')">
+                            <option value="PREPATOP">PREPATOP</option>
+                            <option value="PREPARASECUNDARIA">PREPARASECUNDARIA</option>
+                            <option value="PREPARAANDALUCIA">PREPARAANDALUCIA</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="nuevo-alumno-especialidad-group">
+                        <label class="form-label">Especialidad</label>
+                        <select class="form-select" id="nuevo-alumno-especialidad">
+                            <option value="">Sin especialidad</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Curso *</label>
+                        <input type="text" class="form-control" id="nuevo-alumno-curso" placeholder="Ej: Oposiciones AGE A1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Modalidad</label>
+                        <select class="form-select" id="nuevo-alumno-modalidad">
+                            <option value="presencial">Presencial</option>
+                            <option value="online">Online</option>
+                            <option value="mixta">Mixta</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Estado de Pago</label>
+                        <select class="form-select" id="nuevo-alumno-pago">
+                            <option value="pendiente">Pendiente</option>
+                            <option value="parcial">Parcial</option>
+                            <option value="completo">Completo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="nuevo-alumno-notas" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="saveNuevoAlumno()"><i class="bi bi-check-lg"></i> Crear Alumno</button>
                 </div>
             </div>
         </div>

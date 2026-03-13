@@ -6,6 +6,11 @@ CURSOS = {
     'PREPARAANDALUCIA': ['Administrativo Junta', 'Auxiliar Junta', 'Gestion Procesal', 'Tramitacion Procesal'],
 }
 
+ESPECIALIDADES = {
+    'PREPATOP': ['Primaria', 'PT', 'AL', 'EF', 'Ingles', 'Infantil'],
+    'PREPARAANDALUCIA': ['Primaria', 'PT', 'AL', 'EF', 'Ingles', 'Infantil'],
+}
+
 
 def seed_database():
     """No seed data - user will add real data."""

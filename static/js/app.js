@@ -21,6 +21,11 @@ const ESTADO_LABELS = {
     perdido: 'Perdido',
 };
 
+const ESPECIALIDADES = {
+    PREPATOP: ['Primaria', 'PT', 'AL', 'EF', 'Ingles', 'Infantil'],
+    PREPARAANDALUCIA: ['Primaria', 'PT', 'AL', 'EF', 'Ingles', 'Infantil'],
+};
+
 const TIPO_ICONS = {
     llamada: 'bi-telephone',
     email: 'bi-envelope',
@@ -245,6 +250,26 @@ function exportCSV() {
     window.open(`/api/export/csv?${params}`, '_blank');
 }
 
+// ── Especialidad Helper ───────────────────────────────────────────────────
+function updateEspecialidadOptions(prefix) {
+    const academiaEl = document.getElementById(`${prefix}-academia`);
+    const espSelect = document.getElementById(`${prefix}-especialidad`);
+    const espGroup = document.getElementById(`${prefix}-especialidad-group`);
+    if (!academiaEl || !espSelect) return;
+
+    const academia = academiaEl.value;
+    const opciones = ESPECIALIDADES[academia] || [];
+
+    if (opciones.length === 0) {
+        espGroup.style.display = 'none';
+        espSelect.innerHTML = '<option value="">Sin especialidad</option>';
+    } else {
+        espGroup.style.display = 'block';
+        espSelect.innerHTML = '<option value="">Sin especialidad</option>' +
+            opciones.map(e => `<option value="${e}">${e}</option>`).join('');
+    }
+}
+
 // ── Lead Modal (Create/Edit) ──────────────────────────────────────────────
 async function openLeadModal(id = null) {
     const modal = new bootstrap.Modal(document.getElementById('leadModal'));
@@ -267,12 +292,15 @@ async function openLeadModal(id = null) {
         document.getElementById('lead-academia').value = lead.academia;
         document.getElementById('lead-estado').value = lead.estado;
         document.getElementById('lead-notas').value = lead.notas;
+        updateEspecialidadOptions('lead');
+        document.getElementById('lead-especialidad').value = lead.especialidad || '';
     } else {
         document.getElementById('lead-nombre').value = '';
         document.getElementById('lead-telefono').value = '';
         document.getElementById('lead-email').value = '';
         document.getElementById('lead-estado').value = 'nuevo';
         document.getElementById('lead-notas').value = '';
+        updateEspecialidadOptions('lead');
     }
 
     modal.show();
@@ -286,6 +314,7 @@ async function saveLead() {
         email: document.getElementById('lead-email').value.trim(),
         academia: document.getElementById('lead-academia').value,
         estado: document.getElementById('lead-estado').value,
+        especialidad: document.getElementById('lead-especialidad').value,
         notas: document.getElementById('lead-notas').value.trim(),
     };
 
@@ -331,6 +360,7 @@ async function openLeadDetail(id) {
         <div class="mb-1"><i class="bi bi-telephone me-2"></i>${lead.telefono || '-'}</div>
         <div class="mb-1"><i class="bi bi-envelope me-2"></i>${lead.email || '-'}</div>
         <div class="mb-1"><i class="bi bi-building me-2"></i><span class="badge badge-${lead.academia.toLowerCase()}">${lead.academia}</span></div>
+        ${lead.especialidad ? `<div class="mb-1"><i class="bi bi-mortarboard me-2"></i>Especialidad: ${lead.especialidad}</div>` : ''}
         <div class="mb-1"><i class="bi bi-clock me-2"></i>Creado: ${formatDate(lead.created_at)}</div>
         ${lead.notas ? `<div class="mt-2 p-2 bg-light rounded"><small>${lead.notas}</small></div>` : ''}
     `;
@@ -464,7 +494,7 @@ async function loadAlumnos() {
 
     const tbody = document.getElementById('alumnos-table');
     if (alumnos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No se encontraron alumnos</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No se encontraron alumnos</td></tr>';
         return;
     }
 
@@ -475,6 +505,7 @@ async function loadAlumnos() {
             <td>${a.telefono || '-'}</td>
             <td>${a.email || '-'}</td>
             <td>${showAcademia ? `<span class="badge badge-${a.academia.toLowerCase()}">${a.academia}</span>` : ''}</td>
+            <td>${a.especialidad || '-'}</td>
             <td>${a.curso}</td>
             <td><span class="badge bg-secondary">${a.modalidad}</span></td>
             <td><span class="badge badge-pago-${a.estado_pago}">${a.estado_pago}</span></td>
@@ -509,6 +540,21 @@ async function openAlumnoModal(id) {
     document.getElementById('alumno-modalidad').value = alumno.modalidad;
     document.getElementById('alumno-pago').value = alumno.estado_pago;
     document.getElementById('alumno-notas').value = alumno.notas;
+
+    // Especialidad
+    const espSelect = document.getElementById('alumno-especialidad');
+    const espGroup = document.getElementById('alumno-especialidad-group');
+    const opciones = ESPECIALIDADES[alumno.academia] || [];
+    if (opciones.length === 0) {
+        espGroup.style.display = 'none';
+        espSelect.innerHTML = '<option value="">Sin especialidad</option>';
+    } else {
+        espGroup.style.display = 'block';
+        espSelect.innerHTML = '<option value="">Sin especialidad</option>' +
+            opciones.map(e => `<option value="${e}">${e}</option>`).join('');
+        espSelect.value = alumno.especialidad || '';
+    }
+
     new bootstrap.Modal(document.getElementById('alumnoModal')).show();
 }
 
@@ -518,6 +564,7 @@ async function saveAlumno() {
         nombre: document.getElementById('alumno-nombre').value.trim(),
         telefono: document.getElementById('alumno-telefono').value.trim(),
         email: document.getElementById('alumno-email').value.trim(),
+        especialidad: document.getElementById('alumno-especialidad').value,
         curso: document.getElementById('alumno-curso').value.trim(),
         modalidad: document.getElementById('alumno-modalidad').value,
         estado_pago: document.getElementById('alumno-pago').value,
@@ -526,6 +573,49 @@ async function saveAlumno() {
 
     await api(`/api/alumnos/${id}`, { method: 'PUT', body: data });
     bootstrap.Modal.getInstance(document.getElementById('alumnoModal')).hide();
+    loadAlumnos();
+}
+
+// ── Nuevo Alumno (manual, sin pasar por Lead) ────────────────────────────
+function openNuevoAlumnoModal() {
+    document.getElementById('nuevo-alumno-nombre').value = '';
+    document.getElementById('nuevo-alumno-telefono').value = '';
+    document.getElementById('nuevo-alumno-email').value = '';
+    document.getElementById('nuevo-alumno-curso').value = '';
+    document.getElementById('nuevo-alumno-modalidad').value = 'presencial';
+    document.getElementById('nuevo-alumno-pago').value = 'pendiente';
+    document.getElementById('nuevo-alumno-notas').value = '';
+
+    if (currentAcademia) {
+        document.getElementById('nuevo-alumno-academia').value = currentAcademia;
+        document.getElementById('nuevo-alumno-academia-group').style.display = 'none';
+    } else {
+        document.getElementById('nuevo-alumno-academia-group').style.display = 'block';
+    }
+    updateEspecialidadOptions('nuevo-alumno');
+
+    new bootstrap.Modal(document.getElementById('nuevoAlumnoModal')).show();
+}
+
+async function saveNuevoAlumno() {
+    const data = {
+        nombre: document.getElementById('nuevo-alumno-nombre').value.trim(),
+        telefono: document.getElementById('nuevo-alumno-telefono').value.trim(),
+        email: document.getElementById('nuevo-alumno-email').value.trim(),
+        academia: currentAcademia || document.getElementById('nuevo-alumno-academia').value,
+        especialidad: document.getElementById('nuevo-alumno-especialidad').value,
+        curso: document.getElementById('nuevo-alumno-curso').value.trim(),
+        modalidad: document.getElementById('nuevo-alumno-modalidad').value,
+        estado_pago: document.getElementById('nuevo-alumno-pago').value,
+        notas: document.getElementById('nuevo-alumno-notas').value.trim(),
+    };
+
+    if (!data.nombre) { alert('El nombre es obligatorio'); return; }
+    if (!data.curso) { alert('El curso es obligatorio'); return; }
+
+    await api('/api/alumnos', { method: 'POST', body: data });
+    bootstrap.Modal.getInstance(document.getElementById('nuevoAlumnoModal')).hide();
+    alert('Alumno creado correctamente!');
     loadAlumnos();
 }
 

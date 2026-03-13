@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from flask import Flask, jsonify, render_template, request, Response, session, redirect, url_for
 from flask_cors import CORS
 from models import db, Lead, Seguimiento, NotaActividad, Alumno, ACADEMIAS, ESTADOS
-from database import seed_database
+from database import seed_database, ESPECIALIDADES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
@@ -58,6 +58,12 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+
+@app.route('/api/especialidades')
+@login_required
+def get_especialidades():
+    return jsonify(ESPECIALIDADES)
 
 
 # ── Pages ──────────────────────────────────────────────────────────────────
@@ -190,6 +196,7 @@ def create_lead():
         email=data.get('email', ''),
         academia=data['academia'],
         estado=data.get('estado', 'nuevo'),
+        especialidad=data.get('especialidad', ''),
         notas=data.get('notas', ''),
     )
     db.session.add(lead)
@@ -223,6 +230,8 @@ def update_lead(lead_id):
         if data['academia'] not in ACADEMIAS:
             return jsonify({'error': f'Academia no valida'}), 400
         lead.academia = data['academia']
+    if 'especialidad' in data:
+        lead.especialidad = data['especialidad']
     if 'estado' in data:
         if data['estado'] not in ESTADOS:
             return jsonify({'error': f'Estado no valido'}), 400
@@ -300,6 +309,7 @@ def marcar_pagado(lead_id):
         telefono=lead.telefono,
         email=lead.email,
         academia=lead.academia,
+        especialidad=lead.especialidad,
         fecha_matricula=datetime.utcnow(),
         curso=data.get('curso', ''),
         modalidad=data.get('modalidad', 'presencial'),
@@ -345,6 +355,7 @@ def matricular_lead(lead_id):
         telefono=lead.telefono,
         email=lead.email,
         academia=lead.academia,
+        especialidad=lead.especialidad,
         fecha_matricula=datetime.utcnow(),
         curso=data.get('curso', ''),
         modalidad=data.get('modalidad', 'presencial'),
@@ -411,7 +422,7 @@ def update_alumno(alumno_id):
     alumno = Alumno.query.get_or_404(alumno_id)
     data = request.get_json()
 
-    for field in ['nombre', 'telefono', 'email', 'curso', 'modalidad', 'estado_pago', 'notas']:
+    for field in ['nombre', 'telefono', 'email', 'especialidad', 'curso', 'modalidad', 'estado_pago', 'notas']:
         if field in data:
             setattr(alumno, field, data[field])
 
@@ -427,6 +438,30 @@ def delete_alumno(alumno_id):
     db.session.delete(alumno)
     db.session.commit()
     return jsonify({'message': 'Alumno eliminado'})
+
+
+@app.route('/api/alumnos', methods=['POST'])
+@login_required
+def create_alumno():
+    data = request.get_json()
+    if not data.get('nombre') or not data.get('academia'):
+        return jsonify({'error': 'Nombre y academia son obligatorios'}), 400
+
+    alumno = Alumno(
+        nombre=data['nombre'],
+        telefono=data.get('telefono', ''),
+        email=data.get('email', ''),
+        academia=data['academia'],
+        especialidad=data.get('especialidad', ''),
+        fecha_matricula=datetime.utcnow(),
+        curso=data.get('curso', ''),
+        modalidad=data.get('modalidad', 'presencial'),
+        estado_pago=data.get('estado_pago', 'pendiente'),
+        notas=data.get('notas', ''),
+    )
+    db.session.add(alumno)
+    db.session.commit()
+    return jsonify(alumno.to_dict()), 201
 
 
 # ── Seguimientos ───────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ class Lead(db.Model):
     email = db.Column(db.String(200))
     academia = db.Column(db.String(50), nullable=False)
     estado = db.Column(db.String(20), nullable=False, default='nuevo')
+    especialidad = db.Column(db.String(100), default='')
     notas = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -34,6 +35,7 @@ class Lead(db.Model):
             'email': self.email,
             'academia': self.academia,
             'estado': self.estado,
+            'especialidad': self.especialidad,
             'notas': self.notas,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
@@ -91,6 +93,7 @@ class Alumno(db.Model):
     email = db.Column(db.String(200))
     academia = db.Column(db.String(50), nullable=False)
     fecha_matricula = db.Column(db.DateTime, default=datetime.utcnow)
+    especialidad = db.Column(db.String(100), default='')
     curso = db.Column(db.String(200), default='')
     modalidad = db.Column(db.String(20), default='presencial')
     estado_pago = db.Column(db.String(20), default='pendiente')
@@ -109,6 +112,7 @@ class Alumno(db.Model):
             'email': self.email,
             'academia': self.academia,
             'fecha_matricula': self.fecha_matricula.isoformat() if self.fecha_matricula else None,
+            'especialidad': self.especialidad,
             'curso': self.curso,
             'modalidad': self.modalidad,
             'estado_pago': self.estado_pago,
