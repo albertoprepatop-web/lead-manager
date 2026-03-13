@@ -1,0 +1,152 @@
+/* ── General ───────────────────────────────────────────── */
+body { background: #f0f2f5; font-size: 0.9rem; }
+.card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-radius: 10px; }
+.card-header { background: #fff; border-bottom: 1px solid #eee; }
+
+/* ── Academy Tabs (Top Level) ──────────────────────────── */
+.academy-tabs {
+    display: flex;
+    background: #1a1a2e;
+    padding: 0;
+    overflow-x: auto;
+}
+
+.academy-tab {
+    padding: 0.7rem 1.5rem;
+    border: none;
+    background: transparent;
+    color: #aaa;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.academy-tab:hover { color: #fff; background: rgba(255,255,255,0.05); }
+.academy-tab.active { color: #fff; border-bottom-color: #fff; }
+.academy-tab.tab-prepatop.active { color: #60a5fa; border-bottom-color: #2563EB; }
+.academy-tab.tab-preparasecundaria.active { color: #4ade80; border-bottom-color: #16A34A; }
+.academy-tab.tab-preparaandalucia.active { color: #fb923c; border-bottom-color: #EA580C; }
+
+/* ── Sub Tabs ──────────────────────────────────────────── */
+.sub-tabs {
+    display: flex;
+    background: #fff;
+    border-bottom: 1px solid #dee2e6;
+    padding: 0 1rem;
+    overflow-x: auto;
+}
+
+.sub-tab-group { display: flex; gap: 0; }
+
+.sub-tab {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: #6c757d;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.sub-tab:hover { color: #333; background: #f8f9fa; }
+.sub-tab.active { color: #2563EB; border-bottom-color: #2563EB; font-weight: 600; }
+
+/* ── KPI Cards ─────────────────────────────────────────── */
+.kpi-card { transition: transform 0.2s; }
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.kpi-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
+.kpi-value { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+.kpi-label { color: #6c757d; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ── Academia Colors ───────────────────────────────────── */
+.academia-prepatop { border-left: 4px solid #2563EB; }
+.academia-preparasecundaria { border-left: 4px solid #16A34A; }
+.academia-preparaandalucia { border-left: 4px solid #EA580C; }
+.badge-prepatop { background: #2563EB; }
+.badge-preparasecundaria { background: #16A34A; }
+.badge-preparaandalucia { background: #EA580C; }
+
+/* ── Estado Badges ─────────────────────────────────────── */
+.badge-nuevo { background: #6366F1; }
+.badge-contactado { background: #0EA5E9; }
+.badge-interesado { background: #F59E0B; color: #000; }
+.badge-matriculado { background: #16A34A; }
+.badge-perdido { background: #DC2626; }
+
+/* ── Pago Badges ───────────────────────────────────────── */
+.badge-pago-pendiente { background: #DC2626; }
+.badge-pago-parcial { background: #F59E0B; color: #000; }
+.badge-pago-completo { background: #16A34A; }
+
+/* ── Pipeline ──────────────────────────────────────────── */
+.pipeline-board { min-height: 500px; }
+.pipeline-col { min-width: 200px; }
+
+.pipeline-header {
+    padding: 0.5rem 0.75rem; border-radius: 8px 8px 0 0;
+    font-weight: 700; color: #fff; text-align: center;
+    font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.pipeline-nuevo { background: #6366F1; }
+.pipeline-contactado { background: #0EA5E9; }
+.pipeline-interesado { background: #F59E0B; color: #000; }
+.pipeline-matriculado { background: #16A34A; }
+.pipeline-perdido { background: #DC2626; }
+
+.pipeline-body {
+    background: #f8f9fa; border: 2px dashed #dee2e6; border-top: none;
+    border-radius: 0 0 8px 8px; min-height: 400px; padding: 0.5rem;
+    transition: background 0.2s;
+}
+
+.pipeline-body.drag-over { background: #e8f4fd; border-color: #0EA5E9; }
+
+.pipeline-card {
+    background: #fff; border-radius: 8px; padding: 0.6rem;
+    margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    cursor: grab; transition: box-shadow 0.2s; font-size: 0.85rem;
+}
+
+.pipeline-card:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.15); }
+.pipeline-card.dragging { opacity: 0.5; }
+.pipeline-card .lead-name { font-weight: 600; margin-bottom: 0.15rem; }
+.pipeline-card .lead-meta { color: #6c757d; font-size: 0.75rem; }
+
+/* ── Seguimientos ──────────────────────────────────────── */
+.seg-vencido { background: #FEF2F2 !important; }
+.seg-hoy { background: #FFFBEB !important; }
+
+/* ── Offcanvas ─────────────────────────────────────────── */
+.offcanvas-wide { width: 480px !important; }
+
+.activity-item { border-left: 3px solid #dee2e6; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+.activity-item.tipo-llamada { border-left-color: #16A34A; }
+.activity-item.tipo-email { border-left-color: #2563EB; }
+.activity-item.tipo-reunion { border-left-color: #F59E0B; }
+.activity-item.tipo-otro { border-left-color: #6c757d; }
+.activity-date { font-size: 0.7rem; color: #9ca3af; }
+.activity-tipo { font-size: 0.7rem; text-transform: uppercase; font-weight: 600; }
+
+/* ── Table ─────────────────────────────────────────────── */
+.table th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; border-bottom-width: 1px; }
+.table td { vertical-align: middle; }
+.btn-action { padding: 0.15rem 0.4rem; font-size: 0.75rem; }
+
+/* ── Estado progress in academia cards ─────────────────── */
+.estado-mini { display: flex; justify-content: space-between; font-size: 0.75rem; color: #6c757d; padding: 0.1rem 0; }
+.estado-mini .count { font-weight: 600; color: #333; }
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .pipeline-board { overflow-x: auto; flex-wrap: nowrap; }
+    .pipeline-col { min-width: 180px; flex: 0 0 180px; }
+    .offcanvas-wide { width: 100% !important; }
+    .academy-tab { padding: 0.5rem 0.8rem; font-size: 0.75rem; }
+}

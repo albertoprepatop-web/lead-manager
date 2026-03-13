@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Leads - Academias de Oposiciones</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- ═══ TOP NAV: Academy Tabs ═══ -->
+    <nav class="navbar navbar-dark bg-dark px-3">
+        <span class="navbar-brand fw-bold">
+            <i class="bi bi-mortarboard-fill me-2"></i>CRM Oposiciones
+        </span>
+    </nav>
+    <div class="academy-tabs">
+        <button class="academy-tab active" data-academia="" onclick="switchAcademia('')">
+            <i class="bi bi-grid-3x3-gap-fill"></i> General
+        </button>
+        <button class="academy-tab tab-prepatop" data-academia="PREPATOP" onclick="switchAcademia('PREPATOP')">
+            <i class="bi bi-building"></i> PREPATOP
+        </button>
+        <button class="academy-tab tab-preparasecundaria" data-academia="PREPARASECUNDARIA" onclick="switchAcademia('PREPARASECUNDARIA')">
+            <i class="bi bi-building"></i> PREPARASECUNDARIA
+        </button>
+        <button class="academy-tab tab-preparaandalucia" data-academia="PREPARAANDALUCIA" onclick="switchAcademia('PREPARAANDALUCIA')">
+            <i class="bi bi-building"></i> PREPARAANDALUCIA
+        </button>
+    </div>
+
+    <!-- ═══ SUB NAV ═══ -->
+    <div class="sub-tabs" id="sub-tabs">
+        <!-- General sub-tabs -->
+        <div class="sub-tab-group" id="subtabs-general">
+            <button class="sub-tab active" onclick="showView('dashboard')"><i class="bi bi-speedometer2"></i> Dashboard</button>
+            <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Todos los Alumnos</button>
+            <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
+        </div>
+        <!-- Academy sub-tabs (hidden by default) -->
+        <div class="sub-tab-group" id="subtabs-academia" style="display:none">
+            <button class="sub-tab active" onclick="showView('leads')"><i class="bi bi-people"></i> Leads</button>
+            <button class="sub-tab" onclick="showView('pipeline')"><i class="bi bi-kanban"></i> Pipeline</button>
+            <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Alumnos</button>
+            <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
+        </div>
+    </div>
+
+    <div class="container-fluid px-4 py-3">
+        <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
+        <div id="view-dashboard">
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card kpi-card">
+                        <div class="card-body text-center">
+                            <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
+                            <div class="kpi-value" id="kpi-total">0</div>
+                            <div class="kpi-label">Total Leads</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card kpi-card">
+                        <div class="card-body text-center">
+                            <div class="kpi-icon text-success"><i class="bi bi-person-plus-fill"></i></div>
+                            <div class="kpi-value" id="kpi-nuevos">0</div>
+                            <div class="kpi-label">Nuevos esta semana</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card kpi-card">
+                        <div class="card-body text-center">
+                            <div class="kpi-icon text-primary"><i class="bi bi-person-check-fill"></i></div>
+                            <div class="kpi-value" id="kpi-alumnos">0</div>
+                            <div class="kpi-label">Total Alumnos</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card kpi-card">
+                        <div class="card-body text-center">
+                            <div class="kpi-icon text-warning"><i class="bi bi-bell-fill"></i></div>
+                            <div class="kpi-value" id="kpi-seguimientos">0</div>
+                            <div class="kpi-label">Seguimientos Pendientes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card academia-card academia-prepatop">
+                        <div class="card-body">
+                            <h6 class="fw-bold"><i class="bi bi-building"></i> PREPATOP</h6>
+                            <div class="d-flex justify-content-between"><span>Leads:</span><span class="fw-bold" id="ac-prepatop-total">0</span></div>
+                            <div class="d-flex justify-content-between"><span>Alumnos:</span><span class="fw-bold" id="ac-prepatop-alumnos">0</span></div>
+                            <div id="ac-prepatop-estados"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card academia-card academia-preparasecundaria">
+                        <div class="card-body">
+                            <h6 class="fw-bold"><i class="bi bi-building"></i> PREPARASECUNDARIA</h6>
+                            <div class="d-flex justify-content-between"><span>Leads:</span><span class="fw-bold" id="ac-preparasecundaria-total">0</span></div>
+                            <div class="d-flex justify-content-between"><span>Alumnos:</span><span class="fw-bold" id="ac-preparasecundaria-alumnos">0</span></div>
+                            <div id="ac-preparasecundaria-estados"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card academia-card academia-preparaandalucia">
+                        <div class="card-body">
+                            <h6 class="fw-bold"><i class="bi bi-building"></i> PREPARAANDALUCIA</h6>
+                            <div class="d-flex justify-content-between"><span>Leads:</span><span class="fw-bold" id="ac-preparaandalucia-total">0</span></div>
+                            <div class="d-flex justify-content-between"><span>Alumnos:</span><span class="fw-bold" id="ac-preparaandalucia-alumnos">0</span></div>
+                            <div id="ac-preparaandalucia-estados"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-7">
+                    <div class="card"><div class="card-header fw-bold">Leads por Estado y Academia</div>
+                        <div class="card-body"><canvas id="chart-estados" height="250"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="card"><div class="card-header fw-bold">Leads Nuevos por Mes</div>
+                        <div class="card-body"><canvas id="chart-meses" height="250"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header fw-bold"><i class="bi bi-bell"></i> Seguimientos Proximos</div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead><tr><th>Fecha</th><th>Lead</th><th>Academia</th><th>Nota</th><th>Acciones</th></tr></thead>
+                        <tbody id="dashboard-seguimientos"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════ LEADS ═══════════════════ -->
+        <div id="view-leads" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0" id="leads-title"><i class="bi bi-people"></i> Leads</h5>
+            </div>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm">Buscar</label>
+                            <input type="text" class="form-control form-control-sm" id="filter-busqueda" placeholder="Nombre, email, telefono...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm">Estado</label>
+                            <select class="form-select form-select-sm" id="filter-estado">
+                                <option value="">Todos</option>
+                                <option value="nuevo">Nuevo</option>
+                                <option value="contactado">Contactado</option>
+                                <option value="interesado">Interesado</option>
+                                <option value="matriculado">Matriculado</option>
+                                <option value="perdido">Perdido</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm">Desde</label>
+                            <input type="date" class="form-control form-control-sm" id="filter-desde">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm">Hasta</label>
+                            <input type="date" class="form-control form-control-sm" id="filter-hasta">
+                        </div>
+                        <div class="col-md-2 d-flex gap-1">
+                            <button class="btn btn-sm btn-primary" onclick="loadLeads()"><i class="bi bi-search"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()"><i class="bi bi-x"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <div>
+                    <button class="btn btn-sm btn-success" onclick="openLeadModal()"><i class="bi bi-plus-lg"></i> Nuevo Lead</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="exportCSV()"><i class="bi bi-download"></i> Exportar CSV</button>
+                </div>
+                <span class="text-muted" id="leads-count"></span>
+            </div>
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead><tr><th>Nombre</th><th>Telefono</th><th>Email</th><th>Academia</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead>
+                        <tbody id="leads-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════ PIPELINE ═══════════════════ -->
+        <div id="view-pipeline" style="display:none">
+            <h5 class="mb-3" id="pipeline-title"><i class="bi bi-kanban"></i> Pipeline de Ventas</h5>
+            <div class="row g-3 pipeline-board" id="pipeline-board">
+                <div class="col pipeline-col">
+                    <div class="pipeline-header pipeline-nuevo">Nuevo</div>
+                    <div class="pipeline-body" id="pipeline-nuevo" data-estado="nuevo"
+                         ondragover="event.preventDefault()" ondrop="dropLead(event, 'nuevo')"></div>
+                </div>
+                <div class="col pipeline-col">
+                    <div class="pipeline-header pipeline-contactado">Contactado</div>
+                    <div class="pipeline-body" id="pipeline-contactado" data-estado="contactado"
+                         ondragover="event.preventDefault()" ondrop="dropLead(event, 'contactado')"></div>
+                </div>
+                <div class="col pipeline-col">
+                    <div class="pipeline-header pipeline-interesado">Interesado</div>
+                    <div class="pipeline-body" id="pipeline-interesado" data-estado="interesado"
+                         ondragover="event.preventDefault()" ondrop="dropLead(event, 'interesado')"></div>
+                </div>
+                <div class="col pipeline-col">
+                    <div class="pipeline-header pipeline-matriculado">Matriculado</div>
+                    <div class="pipeline-body" id="pipeline-matriculado" data-estado="matriculado"
+                         ondragover="event.preventDefault()" ondrop="dropLead(event, 'matriculado')"></div>
+                </div>
+                <div class="col pipeline-col">
+                    <div class="pipeline-header pipeline-perdido">Perdido</div>
+                    <div class="pipeline-body" id="pipeline-perdido" data-estado="perdido"
+                         ondragover="event.preventDefault()" ondrop="dropLead(event, 'perdido')"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════ ALUMNOS ═══════════════════ -->
+        <div id="view-alumnos" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0" id="alumnos-title"><i class="bi bi-person-check"></i> Alumnos</h5>
+            </div>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm">Buscar</label>
+                            <input type="text" class="form-control form-control-sm" id="filter-alumnos-busqueda" placeholder="Nombre, email, curso...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm">Estado de Pago</label>
+                            <select class="form-select form-select-sm" id="filter-alumnos-pago">
+                                <option value="">Todos</option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="parcial">Parcial</option>
+                                <option value="completo">Completo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex gap-1">
+                            <button class="btn btn-sm btn-primary" onclick="loadAlumnos()"><i class="bi bi-search"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearAlumnosFilters()"><i class="bi bi-x"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="exportAlumnosCSV()"><i class="bi bi-download"></i> Exportar CSV</button>
+                <span class="text-muted" id="alumnos-count"></span>
+            </div>
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead><tr><th>Nombre</th><th>Telefono</th><th>Email</th><th>Academia</th><th>Curso</th><th>Modalidad</th><th>Pago</th><th>Fecha Matricula</th><th>Acciones</th></tr></thead>
+                        <tbody id="alumnos-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════ SEGUIMIENTOS ═══════════════════ -->
+        <div id="view-seguimientos" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0" id="seguimientos-title"><i class="bi bi-calendar-check"></i> Seguimientos</h5>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="filter-pendientes" checked onchange="loadSeguimientos()">
+                    <label class="form-check-label" for="filter-pendientes">Solo pendientes</label>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead><tr><th>Estado</th><th>Fecha</th><th>Lead</th><th>Academia</th><th>Nota</th><th>Acciones</th></tr></thead>
+                        <tbody id="seguimientos-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════ DETALLE LEAD (Panel lateral) ═══════════════════ -->
+        <div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="leadDetail">
+            <div class="offcanvas-header">
+                <h5 class="offcanvas-title" id="detail-nombre"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+            </div>
+            <div class="offcanvas-body">
+                <div id="detail-info" class="mb-3"></div>
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <a id="detail-tel" href="#" class="btn btn-sm btn-outline-success"><i class="bi bi-telephone"></i> Llamar</a>
+                    <a id="detail-email" href="#" class="btn btn-sm btn-outline-primary"><i class="bi bi-envelope"></i> Email</a>
+                    <button class="btn btn-sm btn-outline-warning" onclick="openSeguimientoModal()"><i class="bi bi-bell-plus"></i> Seguimiento</button>
+                    <button class="btn btn-sm btn-success" id="btn-matricular" onclick="openMatriculaModal()"><i class="bi bi-person-check"></i> Matricular</button>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Estado</label>
+                    <select class="form-select form-select-sm" id="detail-estado-select" onchange="changeLeadEstado()">
+                        <option value="nuevo">Nuevo</option>
+                        <option value="contactado">Contactado</option>
+                        <option value="interesado">Interesado</option>
+                        <option value="matriculado">Matriculado</option>
+                        <option value="perdido">Perdido</option>
+                    </select>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">Agregar Actividad</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <select class="form-select form-select-sm" id="nueva-nota-tipo">
+                                <option value="llamada">Llamada</option>
+                                <option value="email">Email</option>
+                                <option value="reunion">Reunion</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <textarea class="form-control form-control-sm" id="nueva-nota-contenido" rows="2" placeholder="Describe la actividad..."></textarea>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="addNota()">Guardar</button>
+                    </div>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">Seguimientos</div>
+                    <div class="card-body p-0">
+                        <div id="detail-seguimientos" class="list-group list-group-flush"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header fw-bold">Historial de Actividad</div>
+                    <div class="card-body p-0">
+                        <div id="detail-notas" class="list-group list-group-flush"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL LEAD ═══════════════════ -->
+    <div class="modal fade" id="leadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="leadModalTitle">Nuevo Lead</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="lead-id">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre *</label>
+                        <input type="text" class="form-control" id="lead-nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telefono</label>
+                        <input type="text" class="form-control" id="lead-telefono">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="lead-email">
+                    </div>
+                    <div class="mb-3" id="lead-academia-group">
+                        <label class="form-label">Academia *</label>
+                        <select class="form-select" id="lead-academia">
+                            <option value="PREPATOP">PREPATOP</option>
+                            <option value="PREPARASECUNDARIA">PREPARASECUNDARIA</option>
+                            <option value="PREPARAANDALUCIA">PREPARAANDALUCIA</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Estado</label>
+                        <select class="form-select" id="lead-estado">
+                            <option value="nuevo">Nuevo</option>
+                            <option value="contactado">Contactado</option>
+                            <option value="interesado">Interesado</option>
+                            <option value="matriculado">Matriculado</option>
+                            <option value="perdido">Perdido</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="lead-notas" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveLead()">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL MATRICULACION ═══════════════════ -->
+    <div class="modal fade" id="matriculaModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-check"></i> Matricular Alumno</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">El lead pasara a ser alumno de la academia.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Curso *</label>
+                        <input type="text" class="form-control" id="matricula-curso" placeholder="Ej: Oposiciones AGE A1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Modalidad</label>
+                        <select class="form-select" id="matricula-modalidad">
+                            <option value="presencial">Presencial</option>
+                            <option value="online">Online</option>
+                            <option value="mixta">Mixta</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Estado de Pago</label>
+                        <select class="form-select" id="matricula-pago">
+                            <option value="pendiente">Pendiente</option>
+                            <option value="parcial">Parcial</option>
+                            <option value="completo">Completo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="matricula-notas" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="matricularLead()"><i class="bi bi-check-lg"></i> Confirmar Matricula</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL EDITAR ALUMNO ═══════════════════ -->
+    <div class="modal fade" id="alumnoModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Alumno</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="alumno-id">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="alumno-nombre">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telefono</label>
+                        <input type="text" class="form-control" id="alumno-telefono">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="alumno-email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Curso</label>
+                        <input type="text" class="form-control" id="alumno-curso">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Modalidad</label>
+                        <select class="form-select" id="alumno-modalidad">
+                            <option value="presencial">Presencial</option>
+                            <option value="online">Online</option>
+                            <option value="mixta">Mixta</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Estado de Pago</label>
+                        <select class="form-select" id="alumno-pago">
+                            <option value="pendiente">Pendiente</option>
+                            <option value="parcial">Parcial</option>
+                            <option value="completo">Completo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="alumno-notas" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAlumno()">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL SEGUIMIENTO ═══════════════════ -->
+    <div class="modal fade" id="seguimientoModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nuevo Seguimiento</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Fecha y hora</label>
+                        <input type="datetime-local" class="form-control" id="seg-fecha">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nota</label>
+                        <textarea class="form-control" id="seg-nota" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSeguimiento()">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL CONFIRMAR ELIMINAR ═══════════════════ -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="delete-message">Estas seguro? Esta accion no se puede deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="btn-confirm-delete">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
