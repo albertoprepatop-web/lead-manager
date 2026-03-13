@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso - CRM Oposiciones</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 16px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .login-card h2 {
+            color: #e94560;
+            font-weight: 700;
+        }
+        .login-card .text-muted {
+            color: #8892b0 !important;
+        }
+        .login-card label {
+            color: #ccd6f6;
+        }
+        .login-card .form-control {
+            background: #0f3460;
+            border: 1px solid #1a1a2e;
+            color: #ccd6f6;
+            font-size: 1.1rem;
+            padding: 0.75rem;
+            letter-spacing: 4px;
+            text-align: center;
+        }
+        .login-card .form-control:focus {
+            background: #0f3460;
+            border-color: #e94560;
+            color: #ccd6f6;
+            box-shadow: 0 0 0 0.2rem rgba(233,69,96,0.25);
+        }
+        .login-card .btn-primary {
+            background: #e94560;
+            border: none;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .login-card .btn-primary:hover {
+            background: #c73852;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <i class="bi bi-mortarboard-fill" style="font-size: 3rem; color: #e94560;"></i>
+            <h2 class="mt-2">CRM Oposiciones</h2>
+            <p class="text-muted">Introduce el codigo de acceso</p>
+        </div>
+        {% if error %}
+        <div class="alert alert-danger py-2 text-center">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <div class="mb-4">
+                <input type="password" class="form-control" name="code" placeholder="* * * *" autofocus required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-unlock-fill me-2"></i>Entrar
+            </button>
+        </form>
+    </div>
+</body>
+</html>

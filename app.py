@@ -1,14 +1,16 @@
 import csv
 import io
 import os
+import functools
 from datetime import datetime, timedelta
 
-from flask import Flask, jsonify, render_template, request, Response
+from flask import Flask, jsonify, render_template, request, Response, session, redirect, url_for
 from flask_cors import CORS
 from models import db, Lead, Seguimiento, NotaActividad, Alumno, ACADEMIAS, ESTADOS
 from database import seed_database
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # Database: PostgreSQL in production (Railway), SQLite locally
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///leads.db')
@@ -16,6 +18,8 @@ if db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+ACCESS_CODE = os.environ.get('ACCESS_CODE', 'admin')
 
 CORS(app)
 db.init_app(app)
@@ -25,9 +29,41 @@ with app.app_context():
     seed_database()
 
 
+def login_required(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('authenticated'):
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'No autorizado'}), 401
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── Auth ───────────────────────────────────────────────────────────────────
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        code = request.form.get('code', '')
+        if code == ACCESS_CODE:
+            session['authenticated'] = True
+            return redirect(url_for('index'))
+        error = 'Codigo incorrecto'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
 # ── Pages ──────────────────────────────────────────────────────────────────
 
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
@@ -35,6 +71,7 @@ def index():
 # ── Dashboard ──────────────────────────────────────────────────────────────
 
 @app.route('/api/dashboard')
+@login_required
 def dashboard():
     now = datetime.utcnow()
     week_ago = now - timedelta(days=7)
@@ -97,6 +134,7 @@ def dashboard():
 # ── Leads CRUD ─────────────────────────────────────────────────────────────
 
 @app.route('/api/leads')
+@login_required
 def list_leads():
     query = Lead.query
 
@@ -138,6 +176,7 @@ def list_leads():
 
 
 @app.route('/api/leads', methods=['POST'])
+@login_required
 def create_lead():
     data = request.get_json()
     if not data.get('nombre') or not data.get('academia'):
@@ -159,6 +198,7 @@ def create_lead():
 
 
 @app.route('/api/leads/<int:lead_id>')
+@login_required
 def get_lead(lead_id):
     lead = Lead.query.get_or_404(lead_id)
     data = lead.to_dict()
@@ -168,6 +208,7 @@ def get_lead(lead_id):
 
 
 @app.route('/api/leads/<int:lead_id>', methods=['PUT'])
+@login_required
 def update_lead(lead_id):
     lead = Lead.query.get_or_404(lead_id)
     data = request.get_json()
@@ -195,6 +236,7 @@ def update_lead(lead_id):
 
 
 @app.route('/api/leads/<int:lead_id>', methods=['DELETE'])
+@login_required
 def delete_lead(lead_id):
     lead = Lead.query.get_or_404(lead_id)
     db.session.delete(lead)
@@ -205,6 +247,7 @@ def delete_lead(lead_id):
 # ── Matriculacion: Lead -> Alumno ──────────────────────────────────────────
 
 @app.route('/api/leads/<int:lead_id>/matricular', methods=['POST'])
+@login_required
 def matricular_lead(lead_id):
     lead = Lead.query.get_or_404(lead_id)
     data = request.get_json() or {}
@@ -240,6 +283,7 @@ def matricular_lead(lead_id):
 # ── Alumnos CRUD ───────────────────────────────────────────────────────────
 
 @app.route('/api/alumnos')
+@login_required
 def list_alumnos():
     query = Alumno.query
 
@@ -267,12 +311,14 @@ def list_alumnos():
 
 
 @app.route('/api/alumnos/<int:alumno_id>')
+@login_required
 def get_alumno(alumno_id):
     alumno = Alumno.query.get_or_404(alumno_id)
     return jsonify(alumno.to_dict())
 
 
 @app.route('/api/alumnos/<int:alumno_id>', methods=['PUT'])
+@login_required
 def update_alumno(alumno_id):
     alumno = Alumno.query.get_or_404(alumno_id)
     data = request.get_json()
@@ -287,6 +333,7 @@ def update_alumno(alumno_id):
 
 
 @app.route('/api/alumnos/<int:alumno_id>', methods=['DELETE'])
+@login_required
 def delete_alumno(alumno_id):
     alumno = Alumno.query.get_or_404(alumno_id)
     db.session.delete(alumno)
@@ -297,6 +344,7 @@ def delete_alumno(alumno_id):
 # ── Seguimientos ───────────────────────────────────────────────────────────
 
 @app.route('/api/seguimientos')
+@login_required
 def list_seguimientos():
     query = Seguimiento.query
 
@@ -317,6 +365,7 @@ def list_seguimientos():
 
 
 @app.route('/api/seguimientos', methods=['POST'])
+@login_required
 def create_seguimiento():
     data = request.get_json()
     if not data.get('lead_id') or not data.get('fecha'):
@@ -336,6 +385,7 @@ def create_seguimiento():
 
 
 @app.route('/api/seguimientos/<int:seg_id>', methods=['PUT'])
+@login_required
 def update_seguimiento(seg_id):
     seg = Seguimiento.query.get_or_404(seg_id)
     data = request.get_json()
@@ -352,6 +402,7 @@ def update_seguimiento(seg_id):
 
 
 @app.route('/api/seguimientos/<int:seg_id>', methods=['DELETE'])
+@login_required
 def delete_seguimiento(seg_id):
     seg = Seguimiento.query.get_or_404(seg_id)
     db.session.delete(seg)
@@ -362,6 +413,7 @@ def delete_seguimiento(seg_id):
 # ── Notas de Actividad ────────────────────────────────────────────────────
 
 @app.route('/api/notas', methods=['POST'])
+@login_required
 def create_nota():
     data = request.get_json()
     if not data.get('lead_id') or not data.get('contenido'):
@@ -380,6 +432,7 @@ def create_nota():
 
 
 @app.route('/api/leads/<int:lead_id>/notas')
+@login_required
 def get_notas_lead(lead_id):
     Lead.query.get_or_404(lead_id)
     notas = NotaActividad.query.filter_by(lead_id=lead_id).order_by(
@@ -391,6 +444,7 @@ def get_notas_lead(lead_id):
 # ── Export CSV ─────────────────────────────────────────────────────────────
 
 @app.route('/api/export/csv')
+@login_required
 def export_csv():
     query = Lead.query
 
@@ -424,6 +478,7 @@ def export_csv():
 
 
 @app.route('/api/export/alumnos/csv')
+@login_required
 def export_alumnos_csv():
     query = Alumno.query
 
