@@ -132,6 +132,23 @@
                     </div>
                 </div>
             </div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card"><div class="card-header fw-bold">Alumnos PREPATOP por Especialidad</div>
+                        <div class="card-body"><canvas id="chart-esp-prepatop" height="250"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card"><div class="card-header fw-bold">Alumnos PREPARASECUNDARIA por Especialidad</div>
+                        <div class="card-body"><canvas id="chart-esp-preparasecundaria" height="250"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card"><div class="card-header fw-bold">Alumnos PREPARAANDALUCIA por Especialidad</div>
+                        <div class="card-body"><canvas id="chart-esp-preparaandalucia" height="250"></canvas></div>
+                    </div>
+                </div>
+            </div>
             <div class="card">
                 <div class="card-header fw-bold"><i class="bi bi-bell"></i> Seguimientos Proximos</div>
                 <div class="card-body p-0">
@@ -672,6 +689,29 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-info text-white" onclick="marcarPagado()"><i class="bi bi-check-lg"></i> Confirmar Pago</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL FECHA CONTACTO ═══════════════════ -->
+    <div class="modal fade" id="fechaContactoModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-clock"></i> Fecha de Contacto</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Se registra automaticamente la fecha y hora actual. Puedes modificarla si el contacto fue en otro momento.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Fecha y hora del contacto</label>
+                        <input type="datetime-local" class="form-control" id="fecha-contacto-input">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmContacto()"><i class="bi bi-check-lg"></i> Confirmar</button>
                 </div>
             </div>
         </div>

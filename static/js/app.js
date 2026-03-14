@@ -4,6 +4,11 @@ let currentAcademia = ''; // '' = General
 let currentLeadId = null;
 let chartEstados = null;
 let chartMeses = null;
+let chartEspPrepatop = null;
+let chartEspPreparasecundaria = null;
+let chartEspPreparaandalucia = null;
+let pendingContactoLeadId = null;
+let pendingContactoSource = null; // 'detail' or 'quick'
 
 const ACADEMIA_COLORS = {
     PREPATOP: '#2563EB',
@@ -22,8 +27,9 @@ const ESTADO_LABELS = {
 };
 
 const ESPECIALIDADES = {
-    PREPATOP: ['Primaria', 'PT', 'AL', 'EF', 'Ingles', 'Infantil'],
-    PREPARAANDALUCIA: ['Primaria', 'PT', 'AL', 'EF', 'Ingles', 'Infantil'],
+    PREPATOP: ['Infantil', 'Primaria', 'Ingles', 'PT', 'PT Online', 'EF', 'AL'],
+    PREPARAANDALUCIA: ['EF', 'AL', 'PT', 'Primaria'],
+    PREPARASECUNDARIA: ['Tecnologia', 'Historia', 'Lengua', 'Economia', 'Latin', 'FyQ', 'Filosofia', 'Ingles'],
 };
 
 const TIPO_ICONS = {
@@ -129,6 +135,7 @@ async function loadDashboard() {
 
     renderChartEstados(data.por_academia);
     renderChartMeses(data.por_mes);
+    if (data.por_especialidad) renderChartsEspecialidad(data.por_especialidad);
 
     const tbody = document.getElementById('dashboard-seguimientos');
     if (data.seguimientos_proximos.length === 0) {
@@ -176,6 +183,55 @@ function renderChartMeses(porMes) {
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
     });
+}
+
+const ESP_COLORS = [
+    '#2563EB', '#16A34A', '#EA580C', '#8B5CF6', '#EC4899',
+    '#F59E0B', '#06B6D4', '#EF4444', '#10B981', '#6366F1',
+];
+
+function renderChartsEspecialidad(porEspecialidad) {
+    const configs = [
+        { key: 'PREPATOP', canvasId: 'chart-esp-prepatop', chartVar: 'chartEspPrepatop' },
+        { key: 'PREPARASECUNDARIA', canvasId: 'chart-esp-preparasecundaria', chartVar: 'chartEspPreparasecundaria' },
+        { key: 'PREPARAANDALUCIA', canvasId: 'chart-esp-preparaandalucia', chartVar: 'chartEspPreparaandalucia' },
+    ];
+
+    for (const cfg of configs) {
+        const data = porEspecialidad[cfg.key];
+        if (!data) continue;
+
+        const canvas = document.getElementById(cfg.canvasId);
+        if (!canvas) continue;
+        const ctx = canvas.getContext('2d');
+
+        // Destroy old chart
+        if (window[cfg.chartVar]) window[cfg.chartVar].destroy();
+
+        const labels = Object.keys(data);
+        const values = Object.values(data);
+        const total = values.reduce((a, b) => a + b, 0);
+
+        window[cfg.chartVar] = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: ESP_COLORS.slice(0, labels.length),
+                    borderWidth: 2,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                    title: { display: true, text: `Total: ${total} alumnos`, font: { size: 14 } },
+                },
+            },
+        });
+    }
 }
 
 // ── Leads ─────────────────────────────────────────────────────────────────
@@ -239,6 +295,14 @@ function clearFilters() {
 }
 
 async function quickChangeEstado(id, estado) {
+    if (estado === 'contactado') {
+        pendingContactoLeadId = id;
+        pendingContactoSource = 'quick';
+        const now = new Date();
+        document.getElementById('fecha-contacto-input').value = now.toISOString().slice(0, 16);
+        new bootstrap.Modal(document.getElementById('fechaContactoModal')).show();
+        return;
+    }
     await api(`/api/leads/${id}`, { method: 'PUT', body: { estado } });
 }
 
@@ -361,6 +425,7 @@ async function openLeadDetail(id) {
         <div class="mb-1"><i class="bi bi-envelope me-2"></i>${lead.email || '-'}</div>
         <div class="mb-1"><i class="bi bi-building me-2"></i><span class="badge badge-${lead.academia.toLowerCase()}">${lead.academia}</span></div>
         ${lead.especialidad ? `<div class="mb-1"><i class="bi bi-mortarboard me-2"></i>Especialidad: ${lead.especialidad}</div>` : ''}
+        ${lead.fecha_contacto ? `<div class="mb-1"><i class="bi bi-telephone-forward me-2"></i>Contactado: ${formatDate(lead.fecha_contacto)}</div>` : ''}
         <div class="mb-1"><i class="bi bi-clock me-2"></i>Creado: ${formatDate(lead.created_at)}</div>
         ${lead.notas ? `<div class="mt-2 p-2 bg-light rounded"><small>${lead.notas}</small></div>` : ''}
     `;
@@ -402,8 +467,32 @@ async function openLeadDetail(id) {
 
 async function changeLeadEstado() {
     const estado = document.getElementById('detail-estado-select').value;
+    if (estado === 'contactado') {
+        pendingContactoLeadId = currentLeadId;
+        pendingContactoSource = 'detail';
+        const now = new Date();
+        document.getElementById('fecha-contacto-input').value = now.toISOString().slice(0, 16);
+        new bootstrap.Modal(document.getElementById('fechaContactoModal')).show();
+        return;
+    }
     await api(`/api/leads/${currentLeadId}`, { method: 'PUT', body: { estado } });
     openLeadDetail(currentLeadId);
+}
+
+async function confirmContacto() {
+    const fechaContacto = document.getElementById('fecha-contacto-input').value;
+    const body = { estado: 'contactado' };
+    if (fechaContacto) body.fecha_contacto = fechaContacto;
+
+    await api(`/api/leads/${pendingContactoLeadId}`, { method: 'PUT', body });
+    bootstrap.Modal.getInstance(document.getElementById('fechaContactoModal')).hide();
+
+    if (pendingContactoSource === 'detail') {
+        openLeadDetail(pendingContactoLeadId);
+    }
+    refreshCurrentView();
+    pendingContactoLeadId = null;
+    pendingContactoSource = null;
 }
 
 async function addNota() {

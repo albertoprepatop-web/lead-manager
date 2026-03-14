@@ -20,6 +20,7 @@ class Lead(db.Model):
     academia = db.Column(db.String(50), nullable=False)
     estado = db.Column(db.String(20), nullable=False, default='nuevo')
     especialidad = db.Column(db.String(100), default='')
+    fecha_contacto = db.Column(db.DateTime, nullable=True)
     notas = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -36,6 +37,7 @@ class Lead(db.Model):
             'academia': self.academia,
             'estado': self.estado,
             'especialidad': self.especialidad,
+            'fecha_contacto': self.fecha_contacto.isoformat() if self.fecha_contacto else None,
             'notas': self.notas,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,

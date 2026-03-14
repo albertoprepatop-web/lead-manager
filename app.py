@@ -126,6 +126,14 @@ def dashboard():
         Seguimiento.completado == False
     ).order_by(Seguimiento.fecha.asc()).limit(10).all()
 
+    # Alumnos por especialidad y academia
+    por_especialidad = {}
+    for academia_name, especialidades_list in ESPECIALIDADES.items():
+        por_especialidad[academia_name] = {}
+        for esp in especialidades_list:
+            count = Alumno.query.filter_by(academia=academia_name, especialidad=esp).count()
+            por_especialidad[academia_name][esp] = count
+
     return jsonify({
         'total_leads': total,
         'nuevos_semana': nuevos_semana,
@@ -133,6 +141,7 @@ def dashboard():
         'seguimientos_pendientes': seguimientos_pendientes,
         'por_academia': por_academia,
         'por_mes': por_mes,
+        'por_especialidad': por_especialidad,
         'seguimientos_proximos': [s.to_dict() for s in seguimientos_proximos],
     })
 
@@ -241,6 +250,11 @@ def update_lead(lead_id):
 
         # Auto-create follow-up when contacted (remind in 3 days)
         if new_estado == 'contactado' and old_estado != 'contactado':
+            # Set fecha_contacto to now if not explicitly provided
+            if data.get('fecha_contacto'):
+                lead.fecha_contacto = datetime.fromisoformat(data['fecha_contacto'])
+            else:
+                lead.fecha_contacto = datetime.utcnow()
             seg = Seguimiento(
                 lead_id=lead.id,
                 fecha=datetime.utcnow() + timedelta(days=3),
@@ -250,7 +264,7 @@ def update_lead(lead_id):
             db.session.add(seg)
             nota = NotaActividad(
                 lead_id=lead.id,
-                contenido=f'Estado cambiado a: Contactado',
+                contenido=f'Estado cambiado a: Contactado ({lead.fecha_contacto.strftime("%d/%m/%Y %H:%M") if lead.fecha_contacto else ""})',
                 tipo='llamada',
             )
             db.session.add(nota)
@@ -289,6 +303,8 @@ def update_lead(lead_id):
             )
             db.session.add(nota)
 
+    if 'fecha_contacto' in data and data['fecha_contacto']:
+        lead.fecha_contacto = datetime.fromisoformat(data['fecha_contacto'])
     if 'notas' in data:
         lead.notas = data['notas']
 
