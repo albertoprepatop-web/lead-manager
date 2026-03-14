@@ -646,6 +646,25 @@ def export_alumnos_csv():
     )
 
 
+@app.route('/api/db-check')
+@login_required
+def db_check():
+    """Temporary diagnostic endpoint to verify DB connection."""
+    db_url = app.config['SQLALCHEMY_DATABASE_URI']
+    is_postgres = 'postgresql' in db_url
+    leads_count = Lead.query.count()
+    alumnos_count = Alumno.query.count()
+    # Check if fecha_contacto column exists
+    has_fecha_contacto = hasattr(Lead, 'fecha_contacto')
+    return jsonify({
+        'database_type': 'PostgreSQL' if is_postgres else 'SQLite',
+        'leads_count': leads_count,
+        'alumnos_count': alumnos_count,
+        'has_fecha_contacto': has_fecha_contacto,
+        'db_url_prefix': db_url[:20] + '...',
+    })
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, port=port)
