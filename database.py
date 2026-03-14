@@ -9,7 +9,7 @@ CURSOS = {
 ESPECIALIDADES = {
     'PREPATOP': ['Infantil', 'Primaria', 'Ingles', 'PT', 'PT Online', 'EF', 'AL'],
     'PREPARAANDALUCIA': ['EF', 'AL', 'PT', 'Primaria'],
-    'PREPARASECUNDARIA': ['Tecnologia', 'Historia', 'Lengua', 'Economia', 'Latin', 'FyQ', 'Filosofia', 'Ingles'],
+    'PREPARASECUNDARIA': ['Tecnologia', 'Historia', 'Lengua', 'Economia', 'Latin', 'FyQ', 'Filosofia', 'Ingles', 'Musica'],
 }
 
 
