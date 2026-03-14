@@ -126,6 +126,23 @@ def dashboard():
         Seguimiento.completado == False
     ).order_by(Seguimiento.fecha.asc()).limit(10).all()
 
+    # Alumnos por mes (ultimos 6 meses)
+    alumnos_por_mes = []
+    for i in range(5, -1, -1):
+        mes_inicio = (now.replace(day=1) - timedelta(days=30 * i)).replace(day=1)
+        if i > 0:
+            mes_fin = (now.replace(day=1) - timedelta(days=30 * (i - 1))).replace(day=1)
+        else:
+            mes_fin = now + timedelta(days=1)
+        count = Alumno.query.filter(
+            Alumno.fecha_matricula >= mes_inicio,
+            Alumno.fecha_matricula < mes_fin
+        ).count()
+        alumnos_por_mes.append({
+            'mes': mes_inicio.strftime('%b %Y'),
+            'count': count,
+        })
+
     # Alumnos por especialidad y academia
     por_especialidad = {}
     for academia_name, especialidades_list in ESPECIALIDADES.items():
@@ -141,6 +158,7 @@ def dashboard():
         'seguimientos_pendientes': seguimientos_pendientes,
         'por_academia': por_academia,
         'por_mes': por_mes,
+        'alumnos_por_mes': alumnos_por_mes,
         'por_especialidad': por_especialidad,
         'seguimientos_proximos': [s.to_dict() for s in seguimientos_proximos],
     })

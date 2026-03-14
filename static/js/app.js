@@ -4,6 +4,7 @@ let currentAcademia = ''; // '' = General
 let currentLeadId = null;
 let chartEstados = null;
 let chartMeses = null;
+let chartAlumnosMes = null;
 let pendingContactoLeadId = null;
 let pendingContactoSource = null; // 'detail' or 'quick'
 
@@ -132,6 +133,7 @@ async function loadDashboard() {
 
     renderChartEstados(data.por_academia);
     renderChartMeses(data.por_mes);
+    if (data.alumnos_por_mes) renderChartAlumnosMes(data.alumnos_por_mes);
     if (data.por_especialidad) renderChartsEspecialidad(data.por_especialidad);
 
     const tbody = document.getElementById('dashboard-seguimientos');
@@ -179,6 +181,31 @@ function renderChartMeses(porMes) {
             datasets: [{ label: 'Nuevos Leads', data: porMes.map(m => m.count), borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.1)', fill: true, tension: 0.3 }],
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
+    });
+}
+
+function renderChartAlumnosMes(alumnosPorMes) {
+    const ctx = document.getElementById('chart-alumnos-mes').getContext('2d');
+    if (chartAlumnosMes) chartAlumnosMes.destroy();
+    chartAlumnosMes = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: alumnosPorMes.map(m => m.mes),
+            datasets: [{
+                label: 'Nuevos Alumnos',
+                data: alumnosPorMes.map(m => m.count),
+                backgroundColor: '#16A34A',
+                borderColor: '#15803D',
+                borderWidth: 1,
+                borderRadius: 4,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+        },
     });
 }
 
