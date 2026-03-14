@@ -27,7 +27,7 @@ const ESTADO_LABELS = {
 const ESPECIALIDADES = {
     PREPATOP: ['Infantil', 'Primaria', 'Ingles', 'PT', 'PT Online', 'EF', 'AL'],
     PREPARAANDALUCIA: ['EF', 'AL', 'PT', 'Primaria'],
-    PREPARASECUNDARIA: ['Tecnologia', 'Historia', 'Lengua', 'Economia', 'Latin', 'FyQ', 'Filosofia', 'Ingles', 'Musica'],
+    PREPARASECUNDARIA: ['Tecnologia', 'Historia', 'Lengua', 'Economia', 'Latin', 'FyQ', 'Filosofia', 'Ingles', 'Musica', 'EF'],
 };
 
 const TIPO_ICONS = {
