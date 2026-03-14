@@ -4,9 +4,6 @@ let currentAcademia = ''; // '' = General
 let currentLeadId = null;
 let chartEstados = null;
 let chartMeses = null;
-let chartEspPrepatop = null;
-let chartEspPreparasecundaria = null;
-let chartEspPreparaandalucia = null;
 let pendingContactoLeadId = null;
 let pendingContactoSource = null; // 'detail' or 'quick'
 
@@ -185,52 +182,50 @@ function renderChartMeses(porMes) {
     });
 }
 
-const ESP_COLORS = [
-    '#2563EB', '#16A34A', '#EA580C', '#8B5CF6', '#EC4899',
-    '#F59E0B', '#06B6D4', '#EF4444', '#10B981', '#6366F1',
-];
+const MAX_ALUMNOS_GRUPO = 14;
+
+const ESP_BAR_COLORS = {
+    PREPATOP: '#2563EB',
+    PREPARASECUNDARIA: '#16A34A',
+    PREPARAANDALUCIA: '#EA580C',
+};
 
 function renderChartsEspecialidad(porEspecialidad) {
     const configs = [
-        { key: 'PREPATOP', canvasId: 'chart-esp-prepatop', chartVar: 'chartEspPrepatop' },
-        { key: 'PREPARASECUNDARIA', canvasId: 'chart-esp-preparasecundaria', chartVar: 'chartEspPreparasecundaria' },
-        { key: 'PREPARAANDALUCIA', canvasId: 'chart-esp-preparaandalucia', chartVar: 'chartEspPreparaandalucia' },
+        { key: 'PREPATOP', containerId: 'esp-bars-prepatop' },
+        { key: 'PREPARASECUNDARIA', containerId: 'esp-bars-preparasecundaria' },
+        { key: 'PREPARAANDALUCIA', containerId: 'esp-bars-preparaandalucia' },
     ];
 
     for (const cfg of configs) {
         const data = porEspecialidad[cfg.key];
-        if (!data) continue;
+        const container = document.getElementById(cfg.containerId);
+        if (!data || !container) continue;
 
-        const canvas = document.getElementById(cfg.canvasId);
-        if (!canvas) continue;
-        const ctx = canvas.getContext('2d');
+        const color = ESP_BAR_COLORS[cfg.key];
+        const total = Object.values(data).reduce((a, b) => a + b, 0);
 
-        // Destroy old chart
-        if (window[cfg.chartVar]) window[cfg.chartVar].destroy();
-
-        const labels = Object.keys(data);
-        const values = Object.values(data);
-        const total = values.reduce((a, b) => a + b, 0);
-
-        window[cfg.chartVar] = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: ESP_COLORS.slice(0, labels.length),
-                    borderWidth: 2,
-                }],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { font: { size: 11 } } },
-                    title: { display: true, text: `Total: ${total} alumnos`, font: { size: 14 } },
-                },
-            },
-        });
+        let html = '';
+        for (const [esp, count] of Object.entries(data)) {
+            const pct = Math.min((count / MAX_ALUMNOS_GRUPO) * 100, 100);
+            const isFull = count >= MAX_ALUMNOS_GRUPO;
+            const barColor = isFull ? '#EF4444' : color;
+            html += `
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold" style="font-size:0.85rem">${esp}</span>
+                        <span class="badge ${isFull ? 'bg-danger' : 'bg-secondary'}">${count}/${MAX_ALUMNOS_GRUPO}</span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar ${isFull ? 'bg-danger' : ''}" role="progressbar"
+                             style="width: ${pct}%; background-color: ${isFull ? '' : barColor}"
+                             aria-valuenow="${count}" aria-valuemin="0" aria-valuemax="${MAX_ALUMNOS_GRUPO}">
+                        </div>
+                    </div>
+                </div>`;
+        }
+        html += `<div class="text-center text-muted mt-2" style="font-size:0.8rem">Total: ${total} alumnos</div>`;
+        container.innerHTML = html;
     }
 }
 
