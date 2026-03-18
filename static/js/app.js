@@ -58,7 +58,11 @@ function switchAcademia(academia) {
     });
 
     // Show correct sub-tabs
-    if (academia === '') {
+    if (academia === 'GESTION_PREPATOP') {
+        document.getElementById('subtabs-general').style.display = 'none';
+        document.getElementById('subtabs-academia').style.display = 'none';
+        showView('economica');
+    } else if (academia === '') {
         document.getElementById('subtabs-general').style.display = 'flex';
         document.getElementById('subtabs-academia').style.display = 'none';
         showView('dashboard');
@@ -906,50 +910,91 @@ function formatMes(mesStr) {
 }
 
 async function loadEconomica() {
-    if (!currentAcademia) return;
-    document.getElementById('economica-title').innerHTML = `<i class="bi bi-cash-stack"></i> Gestion Economica - ${currentAcademia}`;
+    const apiAcademia = currentAcademia === 'GESTION_PREPATOP' ? 'PREPATOP' : currentAcademia;
+    if (!apiAcademia) return;
 
-    const data = await api(`/api/gestion-economica?academia=${currentAcademia}`);
+    const titleLabel = currentAcademia === 'GESTION_PREPATOP' ? 'PREPATOP 2025-2026' : apiAcademia;
+    document.getElementById('economica-title').innerHTML = `<i class="bi bi-cash-stack"></i> Gestion Economica - ${titleLabel}`;
+
+    const data = await api(`/api/gestion-economica?academia=${apiAcademia}`);
     const meses = data.meses;
-    const alumnos = data.alumnos;
+    const allAlumnos = data.alumnos;
     const totales = data.totales;
 
-    // Build header
-    const thead = document.getElementById('economica-thead');
-    thead.innerHTML = `<tr>
-        <th style="min-width:160px">Alumno</th>
-        <th style="min-width:80px">Cuota</th>
-        ${meses.map(m => `<th class="text-center" style="min-width:120px">${formatMes(m)}</th>`).join('')}
-    </tr>`;
+    // Group students: regular vs Jessica 2 years
+    const regularAlumnos = allAlumnos.filter(a => a.curso !== 'PT Jessica 2 Años');
+    const jessicaAlumnos = allAlumnos.filter(a => a.curso === 'PT Jessica 2 Años');
 
-    // Build body
-    const tbody = document.getElementById('economica-tbody');
-    if (alumnos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${2 + meses.length}" class="text-center text-muted py-4">No hay alumnos en esta academia</td></tr>`;
-    } else {
-        tbody.innerHTML = alumnos.map(a => `<tr>
+    // Group regular students by especialidad
+    const groups = {};
+    for (const a of regularAlumnos) {
+        const esp = a.especialidad || 'Sin especialidad';
+        if (!groups[esp]) groups[esp] = [];
+        groups[esp].push(a);
+    }
+
+    function buildAlumnoRows(alumnos) {
+        return alumnos.map(a => `<tr>
             <td class="fw-bold">${a.nombre}</td>
             <td>${a.cuota ? a.cuota.toFixed(2) + ' EUR' : '-'}</td>
             ${meses.map(m => {
                 const pago = a.pagos[m];
                 if (pago) {
-                    const colorClass = pago.metodo === 'efectivo' ? 'btn-success' : 'btn-primary';
-                    const icon = pago.metodo === 'efectivo' ? 'bi-cash' : 'bi-receipt';
-                    const socioLabel = pago.recogido_por ? ` (${pago.recogido_por})` : '';
+                    const metodoIcon = pago.metodo === 'efectivo' ? 'bi-cash' : 'bi-receipt';
+                    const metodoLabel = pago.metodo === 'efectivo' ? 'Efect.' : 'Recibo';
+                    const socioLabel = pago.recogido_por ? ` (${pago.recogido_por.charAt(0)})` : '';
                     return `<td class="text-center">
-                        <button class="btn btn-sm ${colorClass}" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0}, ${pago.id})" title="${pago.metodo}${socioLabel}: ${pago.cantidad.toFixed(2)} EUR">
-                            <i class="bi ${icon}"></i> ${pago.cantidad.toFixed(2)}
+                        <button class="btn btn-sm btn-success w-100" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0}, ${pago.id})" title="Click para editar">
+                            <i class="bi ${metodoIcon}"></i> ${metodoLabel}${socioLabel}
                         </button>
                     </td>`;
                 } else {
                     return `<td class="text-center">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0})">
-                            <i class="bi bi-plus"></i>
+                        <button class="btn btn-sm btn-outline-danger w-100" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0})">
+                            <i class="bi bi-x-circle"></i> Pendiente
                         </button>
                     </td>`;
                 }
             }).join('')}
         </tr>`).join('');
+    }
+
+    // Build header
+    const thead = document.getElementById('economica-thead');
+    thead.innerHTML = `<tr>
+        <th style="min-width:200px">Alumno</th>
+        <th style="min-width:80px">Cuota</th>
+        ${meses.map(m => `<th class="text-center" style="min-width:120px">${formatMes(m)}</th>`).join('')}
+    </tr>`;
+
+    // Build body with groups
+    const tbody = document.getElementById('economica-tbody');
+    const colSpan = 2 + meses.length;
+
+    if (allAlumnos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-4">No hay alumnos en esta academia</td></tr>`;
+    } else {
+        let html = '';
+        // Specialty order
+        const espOrder = ['EF', 'AL', 'Ingles', 'Infantil', 'PT', 'Primaria', 'PT Online'];
+        const sortedKeys = espOrder.filter(k => groups[k]);
+        // Add any remaining keys
+        for (const k of Object.keys(groups)) {
+            if (!sortedKeys.includes(k)) sortedKeys.push(k);
+        }
+
+        for (const esp of sortedKeys) {
+            html += `<tr class="table-secondary"><td colspan="${colSpan}" class="fw-bold"><i class="bi bi-mortarboard"></i> ${esp} (${groups[esp].length})</td></tr>`;
+            html += buildAlumnoRows(groups[esp]);
+        }
+
+        // Jessica section
+        if (jessicaAlumnos.length > 0) {
+            html += `<tr class="table-warning"><td colspan="${colSpan}" class="fw-bold"><i class="bi bi-star"></i> PT Jessica - 2 Años (${jessicaAlumnos.length})</td></tr>`;
+            html += buildAlumnoRows(jessicaAlumnos);
+        }
+
+        tbody.innerHTML = html;
     }
 
     // Build footer with totals
@@ -1105,7 +1150,8 @@ async function saveNewMes() {
     const mes = document.getElementById('add-mes-input').value;
     if (!mes) { alert('Selecciona un mes'); return; }
 
-    await api('/api/meses', { method: 'POST', body: { mes, academia: currentAcademia } });
+    const apiAcademia = currentAcademia === 'GESTION_PREPATOP' ? 'PREPATOP' : currentAcademia;
+    await api('/api/meses', { method: 'POST', body: { mes, academia: apiAcademia } });
     bootstrap.Modal.getInstance(document.getElementById('addMesModal')).hide();
     loadEconomica();
 }

@@ -744,6 +744,8 @@ def gestion_economica():
         alumnos_data.append({
             'id': a.id,
             'nombre': a.nombre,
+            'especialidad': a.especialidad,
+            'curso': a.curso,
             'cuota': a.cuota or 0,
             'pagos': pagos_map.get(a.id, {}),
         })
