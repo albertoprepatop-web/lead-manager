@@ -9,7 +9,7 @@ from flask_cors import CORS
 from models import db, Lead, Seguimiento, NotaActividad, Alumno, Pago, MesActivo, ACADEMIAS, ESTADOS, SOCIOS
 from database import seed_database, ESPECIALIDADES
 
-app = Flask(__name__)
+app = Flask(__name__)  # v2 economic tabs
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 
 # Database: PostgreSQL in production (Railway), SQLite locally
@@ -23,6 +23,12 @@ ACCESS_CODE = os.environ.get('ACCESS_CODE', 'admin')
 
 CORS(app)
 db.init_app(app)
+
+@app.after_request
+def add_no_cache(response):
+    if 'text/html' in response.content_type:
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return response
 
 with app.app_context():
     db.create_all()

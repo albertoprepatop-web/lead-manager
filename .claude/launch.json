@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "lead-manager",
+      "name": "lead-manager-desktop",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["/Users/albertoolmosdominguez/Desktop/lead-manager/app.py"],
       "port": 5000
