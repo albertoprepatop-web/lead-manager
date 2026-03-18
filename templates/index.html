@@ -37,6 +37,7 @@
             <button class="sub-tab active" onclick="showView('dashboard')"><i class="bi bi-speedometer2"></i> Dashboard</button>
             <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Todos los Alumnos</button>
             <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
+            <button class="sub-tab" onclick="showView('socios')"><i class="bi bi-people-fill"></i> Socios</button>
         </div>
         <!-- Academy sub-tabs (hidden by default) -->
         <div class="sub-tab-group" id="subtabs-academia" style="display:none">
@@ -44,6 +45,7 @@
             <button class="sub-tab" onclick="showView('pipeline')"><i class="bi bi-kanban"></i> Pipeline</button>
             <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Alumnos</button>
             <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
+            <button class="sub-tab" onclick="showView('economica')"><i class="bi bi-cash-stack"></i> Economica</button>
         </div>
     </div>
 
@@ -331,6 +333,32 @@
             </div>
         </div>
 
+        <!-- ═══════════════════ GESTION ECONOMICA ═══════════════════ -->
+        <div id="view-economica" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0" id="economica-title"><i class="bi bi-cash-stack"></i> Gestion Economica</h5>
+                <button class="btn btn-sm btn-primary" onclick="openAddMesModal()"><i class="bi bi-plus-lg"></i> Anadir Mes</button>
+            </div>
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm mb-0" id="economica-table">
+                            <thead id="economica-thead"></thead>
+                            <tbody id="economica-tbody"></tbody>
+                            <tfoot id="economica-tfoot"></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 mt-3" id="economica-totales"></div>
+        </div>
+
+        <!-- ═══════════════════ SOCIOS ═══════════════════ -->
+        <div id="view-socios" style="display:none">
+            <h5 class="mb-3"><i class="bi bi-people-fill"></i> Reparto de Efectivo - Socios</h5>
+            <div class="row g-3" id="socios-cards"></div>
+        </div>
+
         <!-- ═══════════════════ DETALLE LEAD (Panel lateral) ═══════════════════ -->
         <div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="leadDetail">
             <div class="offcanvas-header">
@@ -542,6 +570,10 @@
                         </select>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Cuota Mensual (EUR)</label>
+                        <input type="number" class="form-control" id="alumno-cuota" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Notas</label>
                         <textarea class="form-control" id="alumno-notas" rows="2"></textarea>
                     </div>
@@ -608,6 +640,10 @@
                             <option value="parcial">Parcial</option>
                             <option value="completo">Completo</option>
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cuota Mensual (EUR)</label>
+                        <input type="number" class="form-control" id="nuevo-alumno-cuota" step="0.01" min="0" placeholder="0.00">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Notas</label>
@@ -720,6 +756,70 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="confirmContacto()"><i class="bi bi-check-lg"></i> Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL REGISTRAR PAGO ═══════════════════ -->
+    <div class="modal fade" id="pagoModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-cash-coin"></i> Registrar Pago</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="pago-alumno-id">
+                    <input type="hidden" id="pago-mes">
+                    <input type="hidden" id="pago-id">
+                    <p class="fw-bold mb-2" id="pago-alumno-nombre"></p>
+                    <p class="text-muted mb-3" id="pago-mes-label"></p>
+                    <div class="mb-3">
+                        <label class="form-label">Metodo de Pago *</label>
+                        <select class="form-select" id="pago-metodo" onchange="toggleRecogidoPor()">
+                            <option value="efectivo">Efectivo</option>
+                            <option value="recibo">Recibo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cantidad (EUR) *</label>
+                        <input type="number" class="form-control" id="pago-cantidad" step="0.01" min="0">
+                    </div>
+                    <div class="mb-3" id="pago-recogido-group">
+                        <label class="form-label">Recogido por *</label>
+                        <select class="form-select" id="pago-recogido">
+                            <option value="Alberto">Alberto</option>
+                            <option value="Esteban">Esteban</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger" id="btn-delete-pago" style="display:none" onclick="deletePago()"><i class="bi bi-trash"></i></button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="savePago()"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL ANADIR MES ═══════════════════ -->
+    <div class="modal fade" id="addMesModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calendar-plus"></i> Anadir Mes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Mes</label>
+                        <input type="month" class="form-control" id="add-mes-input">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveNewMes()"><i class="bi bi-check-lg"></i> Anadir</button>
                 </div>
             </div>
         </div>

@@ -93,6 +93,8 @@ function showView(view) {
     else if (view === 'pipeline') loadPipeline();
     else if (view === 'alumnos') loadAlumnos();
     else if (view === 'seguimientos') loadSeguimientos();
+    else if (view === 'economica') loadEconomica();
+    else if (view === 'socios') loadSocios();
 }
 
 // ── API Helper ────────────────────────────────────────────────────────────
@@ -650,6 +652,7 @@ async function openAlumnoModal(id) {
     document.getElementById('alumno-curso').value = alumno.curso;
     document.getElementById('alumno-modalidad').value = alumno.modalidad;
     document.getElementById('alumno-pago').value = alumno.estado_pago;
+    document.getElementById('alumno-cuota').value = alumno.cuota || '';
     document.getElementById('alumno-notas').value = alumno.notas;
 
     // Especialidad
@@ -679,6 +682,7 @@ async function saveAlumno() {
         curso: document.getElementById('alumno-curso').value.trim(),
         modalidad: document.getElementById('alumno-modalidad').value,
         estado_pago: document.getElementById('alumno-pago').value,
+        cuota: document.getElementById('alumno-cuota').value || 0,
         notas: document.getElementById('alumno-notas').value.trim(),
     };
 
@@ -718,6 +722,7 @@ async function saveNuevoAlumno() {
         curso: document.getElementById('nuevo-alumno-curso').value.trim(),
         modalidad: document.getElementById('nuevo-alumno-modalidad').value,
         estado_pago: document.getElementById('nuevo-alumno-pago').value,
+        cuota: document.getElementById('nuevo-alumno-cuota').value || 0,
         notas: document.getElementById('nuevo-alumno-notas').value.trim(),
     };
 
@@ -883,4 +888,264 @@ function refreshCurrentView() {
     else if (currentView === 'dashboard') loadDashboard();
     else if (currentView === 'alumnos') loadAlumnos();
     else if (currentView === 'seguimientos') loadSeguimientos();
+    else if (currentView === 'economica') loadEconomica();
+    else if (currentView === 'socios') loadSocios();
+}
+
+// ── Gestion Economica ────────────────────────────────────────────────────
+const MES_LABELS = {
+    '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+    '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+    '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre',
+};
+
+function formatMes(mesStr) {
+    // "2026-04" -> "Abril 2026"
+    const [year, month] = mesStr.split('-');
+    return `${MES_LABELS[month] || month} ${year}`;
+}
+
+async function loadEconomica() {
+    if (!currentAcademia) return;
+    document.getElementById('economica-title').innerHTML = `<i class="bi bi-cash-stack"></i> Gestion Economica - ${currentAcademia}`;
+
+    const data = await api(`/api/gestion-economica?academia=${currentAcademia}`);
+    const meses = data.meses;
+    const alumnos = data.alumnos;
+    const totales = data.totales;
+
+    // Build header
+    const thead = document.getElementById('economica-thead');
+    thead.innerHTML = `<tr>
+        <th style="min-width:160px">Alumno</th>
+        <th style="min-width:80px">Cuota</th>
+        ${meses.map(m => `<th class="text-center" style="min-width:120px">${formatMes(m)}</th>`).join('')}
+    </tr>`;
+
+    // Build body
+    const tbody = document.getElementById('economica-tbody');
+    if (alumnos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${2 + meses.length}" class="text-center text-muted py-4">No hay alumnos en esta academia</td></tr>`;
+    } else {
+        tbody.innerHTML = alumnos.map(a => `<tr>
+            <td class="fw-bold">${a.nombre}</td>
+            <td>${a.cuota ? a.cuota.toFixed(2) + ' EUR' : '-'}</td>
+            ${meses.map(m => {
+                const pago = a.pagos[m];
+                if (pago) {
+                    const colorClass = pago.metodo === 'efectivo' ? 'btn-success' : 'btn-primary';
+                    const icon = pago.metodo === 'efectivo' ? 'bi-cash' : 'bi-receipt';
+                    const socioLabel = pago.recogido_por ? ` (${pago.recogido_por})` : '';
+                    return `<td class="text-center">
+                        <button class="btn btn-sm ${colorClass}" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0}, ${pago.id})" title="${pago.metodo}${socioLabel}: ${pago.cantidad.toFixed(2)} EUR">
+                            <i class="bi ${icon}"></i> ${pago.cantidad.toFixed(2)}
+                        </button>
+                    </td>`;
+                } else {
+                    return `<td class="text-center">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0})">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </td>`;
+                }
+            }).join('')}
+        </tr>`).join('');
+    }
+
+    // Build footer with totals
+    const tfoot = document.getElementById('economica-tfoot');
+    if (meses.length > 0) {
+        tfoot.innerHTML = `
+            <tr class="table-warning fw-bold">
+                <td>Total Efectivo</td>
+                <td></td>
+                ${meses.map(m => `<td class="text-center">${(totales[m]?.efectivo || 0).toFixed(2)} EUR</td>`).join('')}
+            </tr>
+            <tr class="table-info fw-bold">
+                <td>Total Recibo</td>
+                <td></td>
+                ${meses.map(m => `<td class="text-center">${(totales[m]?.recibo || 0).toFixed(2)} EUR</td>`).join('')}
+            </tr>
+            <tr class="table-dark fw-bold">
+                <td>TOTAL</td>
+                <td></td>
+                ${meses.map(m => `<td class="text-center">${(totales[m]?.total || 0).toFixed(2)} EUR</td>`).join('')}
+            </tr>`;
+    } else {
+        tfoot.innerHTML = '';
+    }
+
+    // Summary cards
+    const totalEfectivo = Object.values(totales).reduce((sum, t) => sum + (t.efectivo || 0), 0);
+    const totalRecibo = Object.values(totales).reduce((sum, t) => sum + (t.recibo || 0), 0);
+    document.getElementById('economica-totales').innerHTML = `
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="text-success"><i class="bi bi-cash"></i> Total Efectivo</h6>
+                    <h3 class="fw-bold">${totalEfectivo.toFixed(2)} EUR</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h6 class="text-primary"><i class="bi bi-receipt"></i> Total Recibo</h6>
+                    <h3 class="fw-bold">${totalRecibo.toFixed(2)} EUR</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-dark">
+                <div class="card-body text-center">
+                    <h6><i class="bi bi-wallet2"></i> Total General</h6>
+                    <h3 class="fw-bold">${(totalEfectivo + totalRecibo).toFixed(2)} EUR</h3>
+                </div>
+            </div>
+        </div>`;
+}
+
+function openPagoModal(alumnoId, mes, cuota, pagoId = null) {
+    document.getElementById('pago-alumno-id').value = alumnoId;
+    document.getElementById('pago-mes').value = mes;
+    document.getElementById('pago-id').value = pagoId || '';
+    document.getElementById('pago-mes-label').textContent = formatMes(mes);
+    document.getElementById('pago-metodo').value = 'efectivo';
+    document.getElementById('pago-cantidad').value = cuota || '';
+    document.getElementById('pago-recogido').value = 'Alberto';
+    document.getElementById('btn-delete-pago').style.display = pagoId ? 'inline-block' : 'none';
+
+    // Find alumno name from the table
+    const rows = document.querySelectorAll('#economica-tbody tr');
+    let nombre = '';
+    rows.forEach(r => {
+        const btn = r.querySelector(`button[onclick*="openPagoModal(${alumnoId},"]`) || r.querySelector(`button[onclick*="openPagoModal(${alumnoId}, "]`);
+        if (btn) nombre = r.cells[0].textContent;
+    });
+    document.getElementById('pago-alumno-nombre').textContent = nombre;
+
+    toggleRecogidoPor();
+
+    // If editing existing pago, load its data
+    if (pagoId) {
+        // We need to find the pago data - it's embedded in the button title
+        const btn = document.querySelector(`button[onclick*="openPagoModal(${alumnoId}, '${mes}', ${cuota}, ${pagoId})"]`);
+        if (btn) {
+            const title = btn.getAttribute('title');
+            if (title) {
+                const isEfectivo = title.startsWith('efectivo');
+                document.getElementById('pago-metodo').value = isEfectivo ? 'efectivo' : 'recibo';
+                toggleRecogidoPor();
+                // Extract recogido_por from "(Alberto)" or "(Esteban)"
+                const socioMatch = title.match(/\((\w+)\)/);
+                if (socioMatch) document.getElementById('pago-recogido').value = socioMatch[1];
+                // Extract cantidad
+                const cantMatch = title.match(/([\d.]+) EUR/);
+                if (cantMatch) document.getElementById('pago-cantidad').value = cantMatch[1];
+            }
+        }
+    }
+
+    new bootstrap.Modal(document.getElementById('pagoModal')).show();
+}
+
+function toggleRecogidoPor() {
+    const metodo = document.getElementById('pago-metodo').value;
+    document.getElementById('pago-recogido-group').style.display = metodo === 'efectivo' ? 'block' : 'none';
+}
+
+async function savePago() {
+    const alumnoId = document.getElementById('pago-alumno-id').value;
+    const mes = document.getElementById('pago-mes').value;
+    const pagoId = document.getElementById('pago-id').value;
+    const metodo = document.getElementById('pago-metodo').value;
+    const cantidad = document.getElementById('pago-cantidad').value;
+    const recogidoPor = document.getElementById('pago-recogido').value;
+
+    if (!cantidad || parseFloat(cantidad) <= 0) { alert('La cantidad es obligatoria'); return; }
+
+    const body = {
+        alumno_id: parseInt(alumnoId),
+        mes,
+        metodo,
+        cantidad: parseFloat(cantidad),
+        recogido_por: metodo === 'efectivo' ? recogidoPor : null,
+    };
+
+    if (pagoId) {
+        await api(`/api/pagos/${pagoId}`, { method: 'PUT', body });
+    } else {
+        await api('/api/pagos', { method: 'POST', body });
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('pagoModal')).hide();
+    loadEconomica();
+}
+
+async function deletePago() {
+    const pagoId = document.getElementById('pago-id').value;
+    if (!pagoId) return;
+    if (!confirm('Eliminar este pago?')) return;
+
+    await api(`/api/pagos/${pagoId}`, { method: 'DELETE' });
+    bootstrap.Modal.getInstance(document.getElementById('pagoModal')).hide();
+    loadEconomica();
+}
+
+function openAddMesModal() {
+    // Default to next month
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 2).padStart(2, '0'); // next month (0-indexed + 1 + 1)
+    document.getElementById('add-mes-input').value = `${year}-${month}`;
+    new bootstrap.Modal(document.getElementById('addMesModal')).show();
+}
+
+async function saveNewMes() {
+    const mes = document.getElementById('add-mes-input').value;
+    if (!mes) { alert('Selecciona un mes'); return; }
+
+    await api('/api/meses', { method: 'POST', body: { mes, academia: currentAcademia } });
+    bootstrap.Modal.getInstance(document.getElementById('addMesModal')).hide();
+    loadEconomica();
+}
+
+// ── Socios ───────────────────────────────────────────────────────────────
+async function loadSocios() {
+    const data = await api('/api/socios');
+    const { socios, meses } = data;
+
+    const container = document.getElementById('socios-cards');
+    const totalGeneral = Object.values(socios).reduce((sum, s) => sum + s.total, 0);
+
+    container.innerHTML = Object.entries(socios).map(([nombre, info]) => {
+        const pct = totalGeneral > 0 ? ((info.total / totalGeneral) * 100).toFixed(1) : 0;
+        return `
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header fw-bold bg-dark text-white">
+                    <i class="bi bi-person-circle"></i> ${nombre}
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h2 class="fw-bold text-success">${info.total.toFixed(2)} EUR</h2>
+                        <span class="text-muted">Total efectivo recogido (${pct}%)</span>
+                    </div>
+                    ${meses.length > 0 ? `
+                    <table class="table table-sm">
+                        <thead><tr><th>Mes</th><th class="text-end">Efectivo</th></tr></thead>
+                        <tbody>
+                            ${meses.map(m => `<tr>
+                                <td>${formatMes(m)}</td>
+                                <td class="text-end fw-bold">${(info.por_mes[m] || 0).toFixed(2)} EUR</td>
+                            </tr>`).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-dark"><td class="fw-bold">Total</td><td class="text-end fw-bold">${info.total.toFixed(2)} EUR</td></tr>
+                        </tfoot>
+                    </table>` : '<p class="text-muted text-center">No hay pagos registrados</p>'}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
 }

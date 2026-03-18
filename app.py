@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, render_template, request, Response, session, redirect, url_for
 from flask_cors import CORS
-from models import db, Lead, Seguimiento, NotaActividad, Alumno, ACADEMIAS, ESTADOS
+from models import db, Lead, Seguimiento, NotaActividad, Alumno, Pago, MesActivo, ACADEMIAS, ESTADOS, SOCIOS
 from database import seed_database, ESPECIALIDADES
 
 app = Flask(__name__)
@@ -27,6 +27,16 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
     seed_database()
+    # Auto-migrate: add cuota column if missing
+    try:
+        from sqlalchemy import text, inspect
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('alumnos')]
+        if 'cuota' not in columns:
+            db.session.execute(text('ALTER TABLE alumnos ADD COLUMN cuota FLOAT DEFAULT 0'))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def login_required(f):
@@ -459,6 +469,8 @@ def update_alumno(alumno_id):
     for field in ['nombre', 'telefono', 'email', 'especialidad', 'curso', 'modalidad', 'estado_pago', 'notas']:
         if field in data:
             setattr(alumno, field, data[field])
+    if 'cuota' in data:
+        alumno.cuota = float(data['cuota']) if data['cuota'] else 0
 
     alumno.updated_at = datetime.utcnow()
     db.session.commit()
@@ -491,6 +503,7 @@ def create_alumno():
         curso=data.get('curso', ''),
         modalidad=data.get('modalidad', 'presencial'),
         estado_pago=data.get('estado_pago', 'pendiente'),
+        cuota=float(data.get('cuota', 0)) if data.get('cuota') else 0,
         notas=data.get('notas', ''),
     )
     db.session.add(alumno)
@@ -662,6 +675,173 @@ def export_alumnos_csv():
         mimetype='text/csv',
         headers={'Content-Disposition': 'attachment; filename=alumnos_export.csv'},
     )
+
+
+# ── Gestion Economica ─────────────────────────────────────────────────────
+
+@app.route('/api/meses')
+@login_required
+def list_meses():
+    academia = request.args.get('academia')
+    query = MesActivo.query
+    if academia:
+        query = query.filter_by(academia=academia)
+    meses = query.order_by(MesActivo.mes.asc()).all()
+    return jsonify([m.to_dict() for m in meses])
+
+
+@app.route('/api/meses', methods=['POST'])
+@login_required
+def create_mes():
+    data = request.get_json()
+    mes = data.get('mes')  # "2026-04"
+    academia = data.get('academia')
+    if not mes or not academia:
+        return jsonify({'error': 'mes y academia son obligatorios'}), 400
+    existing = MesActivo.query.filter_by(mes=mes, academia=academia).first()
+    if existing:
+        return jsonify({'error': 'Ese mes ya existe para esa academia'}), 400
+    m = MesActivo(mes=mes, academia=academia)
+    db.session.add(m)
+    db.session.commit()
+    return jsonify(m.to_dict()), 201
+
+
+@app.route('/api/gestion-economica')
+@login_required
+def gestion_economica():
+    academia = request.args.get('academia')
+    if not academia:
+        return jsonify({'error': 'academia es obligatorio'}), 400
+
+    # Get active months for this academy
+    meses = MesActivo.query.filter_by(academia=academia).order_by(MesActivo.mes.asc()).all()
+    meses_list = [m.mes for m in meses]
+
+    # Get all students for this academy
+    alumnos = Alumno.query.filter_by(academia=academia).order_by(Alumno.nombre.asc()).all()
+
+    # Get all payments for these students
+    alumno_ids = [a.id for a in alumnos]
+    pagos = Pago.query.filter(Pago.alumno_id.in_(alumno_ids)).all() if alumno_ids else []
+
+    # Build payments lookup: {alumno_id: {mes: pago_dict}}
+    pagos_map = {}
+    for p in pagos:
+        if p.alumno_id not in pagos_map:
+            pagos_map[p.alumno_id] = {}
+        pagos_map[p.alumno_id][p.mes] = p.to_dict()
+
+    # Build response
+    alumnos_data = []
+    for a in alumnos:
+        alumnos_data.append({
+            'id': a.id,
+            'nombre': a.nombre,
+            'cuota': a.cuota or 0,
+            'pagos': pagos_map.get(a.id, {}),
+        })
+
+    # Totals per month
+    totales = {}
+    for mes in meses_list:
+        efectivo = sum(p.cantidad for p in pagos if p.mes == mes and p.metodo == 'efectivo')
+        recibo = sum(p.cantidad for p in pagos if p.mes == mes and p.metodo == 'recibo')
+        totales[mes] = {'efectivo': efectivo, 'recibo': recibo, 'total': efectivo + recibo}
+
+    return jsonify({
+        'meses': meses_list,
+        'alumnos': alumnos_data,
+        'totales': totales,
+    })
+
+
+@app.route('/api/pagos', methods=['POST'])
+@login_required
+def create_pago():
+    data = request.get_json()
+    alumno_id = data.get('alumno_id')
+    mes = data.get('mes')
+    metodo = data.get('metodo')
+    cantidad = data.get('cantidad', 0)
+
+    if not alumno_id or not mes or not metodo:
+        return jsonify({'error': 'alumno_id, mes y metodo son obligatorios'}), 400
+
+    # Check if payment already exists for this alumno+mes
+    existing = Pago.query.filter_by(alumno_id=alumno_id, mes=mes).first()
+    if existing:
+        return jsonify({'error': 'Ya existe un pago para este alumno en este mes'}), 400
+
+    pago = Pago(
+        alumno_id=alumno_id,
+        mes=mes,
+        metodo=metodo,
+        cantidad=float(cantidad),
+        recogido_por=data.get('recogido_por') if metodo == 'efectivo' else None,
+    )
+    db.session.add(pago)
+    db.session.commit()
+    return jsonify(pago.to_dict()), 201
+
+
+@app.route('/api/pagos/<int:pago_id>', methods=['PUT'])
+@login_required
+def update_pago(pago_id):
+    pago = Pago.query.get_or_404(pago_id)
+    data = request.get_json()
+
+    if 'metodo' in data:
+        pago.metodo = data['metodo']
+    if 'cantidad' in data:
+        pago.cantidad = float(data['cantidad'])
+    if 'recogido_por' in data:
+        pago.recogido_por = data['recogido_por'] if pago.metodo == 'efectivo' else None
+
+    db.session.commit()
+    return jsonify(pago.to_dict())
+
+
+@app.route('/api/pagos/<int:pago_id>', methods=['DELETE'])
+@login_required
+def delete_pago(pago_id):
+    pago = Pago.query.get_or_404(pago_id)
+    db.session.delete(pago)
+    db.session.commit()
+    return jsonify({'message': 'Pago eliminado'})
+
+
+@app.route('/api/socios')
+@login_required
+def socios():
+    # Get all cash payments grouped by recogido_por
+    pagos_efectivo = Pago.query.filter_by(metodo='efectivo').all()
+
+    socios_data = {}
+    for socio in SOCIOS:
+        pagos_socio = [p for p in pagos_efectivo if p.recogido_por == socio]
+        total = sum(p.cantidad for p in pagos_socio)
+
+        # Group by month
+        por_mes = {}
+        for p in pagos_socio:
+            if p.mes not in por_mes:
+                por_mes[p.mes] = 0
+            por_mes[p.mes] += p.cantidad
+
+        socios_data[socio] = {
+            'total': total,
+            'por_mes': por_mes,
+        }
+
+    # Get all active months across all academies
+    meses = MesActivo.query.order_by(MesActivo.mes.asc()).all()
+    meses_unicos = sorted(set(m.mes for m in meses))
+
+    return jsonify({
+        'socios': socios_data,
+        'meses': meses_unicos,
+    })
 
 
 @app.route('/api/db-check')

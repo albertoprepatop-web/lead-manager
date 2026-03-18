@@ -8,6 +8,8 @@ ESTADOS = ['nuevo', 'contactado', 'no_coge', 'interesado', 'a_espera_de_pago', '
 TIPOS_NOTA = ['llamada', 'email', 'reunion', 'otro']
 MODALIDADES = ['presencial', 'online', 'mixta']
 ESTADOS_PAGO = ['pendiente', 'parcial', 'completo']
+METODOS_PAGO = ['efectivo', 'recibo']
+SOCIOS = ['Alberto', 'Esteban']
 
 
 class Lead(db.Model):
@@ -99,6 +101,7 @@ class Alumno(db.Model):
     curso = db.Column(db.String(200), default='')
     modalidad = db.Column(db.String(20), default='presencial')
     estado_pago = db.Column(db.String(20), default='pendiente')
+    cuota = db.Column(db.Float, default=0)
     notas = db.Column(db.Text, default='')
     lead_id = db.Column(db.Integer, db.ForeignKey('leads.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -118,8 +121,51 @@ class Alumno(db.Model):
             'curso': self.curso,
             'modalidad': self.modalidad,
             'estado_pago': self.estado_pago,
+            'cuota': self.cuota or 0,
             'notas': self.notas,
             'lead_id': self.lead_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Pago(db.Model):
+    __tablename__ = 'pagos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    alumno_id = db.Column(db.Integer, db.ForeignKey('alumnos.id'), nullable=False)
+    mes = db.Column(db.String(7), nullable=False)  # "2026-04"
+    metodo = db.Column(db.String(20), nullable=False)  # efectivo / recibo
+    cantidad = db.Column(db.Float, nullable=False, default=0)
+    recogido_por = db.Column(db.String(50), nullable=True)  # Alberto / Esteban (solo efectivo)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    alumno = db.relationship('Alumno', backref='pagos', lazy=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'alumno_id': self.alumno_id,
+            'alumno_nombre': self.alumno.nombre if self.alumno else None,
+            'alumno_academia': self.alumno.academia if self.alumno else None,
+            'mes': self.mes,
+            'metodo': self.metodo,
+            'cantidad': self.cantidad,
+            'recogido_por': self.recogido_por,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class MesActivo(db.Model):
+    __tablename__ = 'meses_activos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mes = db.Column(db.String(7), nullable=False)  # "2026-04"
+    academia = db.Column(db.String(50), nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'mes': self.mes,
+            'academia': self.academia,
         }
