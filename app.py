@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, render_template, request, Response, session, redirect, url_for
 from flask_cors import CORS
-from models import db, Lead, Seguimiento, NotaActividad, Alumno, Pago, MesActivo, ACADEMIAS, ESTADOS, SOCIOS
+from models import db, Lead, Seguimiento, NotaActividad, Alumno, Pago, MesActivo, RegistroEfectivo, ACADEMIAS, ESTADOS, SOCIOS
 from database import seed_database, ESPECIALIDADES
 
 app = Flask(__name__)  # v2 economic tabs
@@ -822,34 +822,50 @@ def delete_pago(pago_id):
 @app.route('/api/socios')
 @login_required
 def socios():
-    # Get all cash payments grouped by recogido_por
-    pagos_efectivo = Pago.query.filter_by(metodo='efectivo').all()
+    # Get all ledger entries
+    registros = RegistroEfectivo.query.order_by(RegistroEfectivo.created_at.desc()).all()
 
     socios_data = {}
     for socio in SOCIOS:
-        pagos_socio = [p for p in pagos_efectivo if p.recogido_por == socio]
-        total = sum(p.cantidad for p in pagos_socio)
-
-        # Group by month
-        por_mes = {}
-        for p in pagos_socio:
-            if p.mes not in por_mes:
-                por_mes[p.mes] = 0
-            por_mes[p.mes] += p.cantidad
-
-        socios_data[socio] = {
-            'total': total,
-            'por_mes': por_mes,
-        }
-
-    # Get all active months across all academies
-    meses = MesActivo.query.order_by(MesActivo.mes.asc()).all()
-    meses_unicos = sorted(set(m.mes for m in meses))
+        registros_socio = [r for r in registros if r.socio == socio]
+        total = sum(r.cantidad for r in registros_socio)
+        socios_data[socio] = {'total': total}
 
     return jsonify({
         'socios': socios_data,
-        'meses': meses_unicos,
+        'registros': [r.to_dict() for r in registros],
     })
+
+
+@app.route('/api/registro-efectivo', methods=['POST'])
+@login_required
+def create_registro_efectivo():
+    data = request.get_json()
+    socio = data.get('socio')
+    alumno_nombre = data.get('alumno_nombre')
+    cantidad = data.get('cantidad')
+
+    if not socio or not alumno_nombre or not cantidad:
+        return jsonify({'error': 'socio, alumno y cantidad son obligatorios'}), 400
+
+    registro = RegistroEfectivo(
+        socio=socio,
+        alumno_nombre=alumno_nombre,
+        cantidad=float(cantidad),
+        nota=data.get('nota', ''),
+    )
+    db.session.add(registro)
+    db.session.commit()
+    return jsonify(registro.to_dict()), 201
+
+
+@app.route('/api/registro-efectivo/<int:registro_id>', methods=['DELETE'])
+@login_required
+def delete_registro_efectivo(registro_id):
+    registro = RegistroEfectivo.query.get_or_404(registro_id)
+    db.session.delete(registro)
+    db.session.commit()
+    return jsonify({'message': 'Registro eliminado'})
 
 
 @app.route('/api/db-check')

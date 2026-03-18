@@ -169,3 +169,24 @@ class MesActivo(db.Model):
             'mes': self.mes,
             'academia': self.academia,
         }
+
+
+class RegistroEfectivo(db.Model):
+    __tablename__ = 'registro_efectivo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    socio = db.Column(db.String(50), nullable=False)  # Alberto / Esteban
+    alumno_nombre = db.Column(db.String(200), nullable=False)
+    cantidad = db.Column(db.Float, nullable=False)
+    nota = db.Column(db.String(500), default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'socio': self.socio,
+            'alumno_nombre': self.alumno_nombre,
+            'cantidad': self.cantidad,
+            'nota': self.nota,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

@@ -357,8 +357,20 @@
 
         <!-- ═══════════════════ SOCIOS ═══════════════════ -->
         <div id="view-socios" style="display:none">
-            <h5 class="mb-3"><i class="bi bi-people-fill"></i> Reparto de Efectivo - Socios</h5>
-            <div class="row g-3" id="socios-cards"></div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0"><i class="bi bi-people-fill"></i> Cuaderno de Efectivo - Socios</h5>
+                <button class="btn btn-sm btn-success" onclick="openRegistroEfectivoModal()"><i class="bi bi-plus-lg"></i> Registrar Cobro</button>
+            </div>
+            <div class="row g-3 mb-4" id="socios-totales"></div>
+            <div class="card">
+                <div class="card-header fw-bold"><i class="bi bi-journal-text"></i> Registro de Cobros en Efectivo</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead><tr><th>Fecha</th><th>Socio</th><th>Alumno</th><th>Mes</th><th>Cantidad</th><th></th></tr></thead>
+                        <tbody id="socios-registro"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- ═══════════════════ DETALLE LEAD (Panel lateral) ═══════════════════ -->
@@ -800,6 +812,43 @@
                     <button type="button" class="btn btn-outline-danger" id="btn-delete-pago" style="display:none" onclick="deletePago()"><i class="bi bi-trash"></i></button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-success" onclick="savePago()"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL REGISTRAR COBRO EFECTIVO ═══════════════════ -->
+    <div class="modal fade" id="registroEfectivoModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-cash"></i> Registrar Cobro</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Quien cobra *</label>
+                        <select class="form-select" id="registro-socio">
+                            <option value="Alberto">Alberto</option>
+                            <option value="Esteban">Esteban</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Alumno *</label>
+                        <input type="text" class="form-control" id="registro-alumno" placeholder="Nombre del alumno">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cantidad (EUR) *</label>
+                        <input type="number" class="form-control" id="registro-cantidad" step="0.01" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Concepto / Nota</label>
+                        <input type="text" class="form-control" id="registro-nota" placeholder="Ej: Pago abril EF">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="saveRegistroEfectivo()"><i class="bi bi-check-lg"></i> Registrar</button>
                 </div>
             </div>
         </div>

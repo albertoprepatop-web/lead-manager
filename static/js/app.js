@@ -1159,39 +1159,75 @@ async function saveNewMes() {
 // ── Socios ───────────────────────────────────────────────────────────────
 async function loadSocios() {
     const data = await api('/api/socios');
-    const { socios, meses } = data;
-
-    const container = document.getElementById('socios-cards');
+    const { socios, registros } = data;
     const totalGeneral = Object.values(socios).reduce((sum, s) => sum + s.total, 0);
 
-    container.innerHTML = Object.entries(socios).map(([nombre, info]) => {
+    // Totals cards
+    document.getElementById('socios-totales').innerHTML = Object.entries(socios).map(([nombre, info]) => {
         const pct = totalGeneral > 0 ? ((info.total / totalGeneral) * 100).toFixed(1) : 0;
-        return `
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header fw-bold bg-dark text-white">
-                    <i class="bi bi-person-circle"></i> ${nombre}
-                </div>
-                <div class="card-body">
-                    <div class="text-center mb-3">
-                        <h2 class="fw-bold text-success">${info.total.toFixed(2)} EUR</h2>
-                        <span class="text-muted">Total efectivo recogido (${pct}%)</span>
-                    </div>
-                    ${meses.length > 0 ? `
-                    <table class="table table-sm">
-                        <thead><tr><th>Mes</th><th class="text-end">Efectivo</th></tr></thead>
-                        <tbody>
-                            ${meses.map(m => `<tr>
-                                <td>${formatMes(m)}</td>
-                                <td class="text-end fw-bold">${(info.por_mes[m] || 0).toFixed(2)} EUR</td>
-                            </tr>`).join('')}
-                        </tbody>
-                        <tfoot>
-                            <tr class="table-dark"><td class="fw-bold">Total</td><td class="text-end fw-bold">${info.total.toFixed(2)} EUR</td></tr>
-                        </tfoot>
-                    </table>` : '<p class="text-muted text-center">No hay pagos registrados</p>'}
+        return `<div class="col-md-4">
+            <div class="card border-dark">
+                <div class="card-body text-center">
+                    <h6 class="fw-bold"><i class="bi bi-person-circle"></i> ${nombre}</h6>
+                    <h3 class="fw-bold text-success">${info.total.toFixed(2)} EUR</h3>
+                    <small class="text-muted">${pct}% del total</small>
                 </div>
             </div>
         </div>`;
-    }).join('');
+    }).join('') + `<div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h6 class="fw-bold"><i class="bi bi-wallet2"></i> Total</h6>
+                <h3 class="fw-bold">${totalGeneral.toFixed(2)} EUR</h3>
+            </div>
+        </div>
+    </div>`;
+
+    // Ledger table
+    const tbody = document.getElementById('socios-registro');
+    if (registros.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay cobros registrados</td></tr>';
+    } else {
+        tbody.innerHTML = registros.map(r => `<tr>
+            <td class="text-muted" style="font-size:0.8rem">${formatDate(r.created_at)}</td>
+            <td><span class="badge bg-dark">${r.socio}</span></td>
+            <td class="fw-bold">${r.alumno_nombre}</td>
+            <td>${r.nota || '-'}</td>
+            <td class="fw-bold text-success">${r.cantidad.toFixed(2)} EUR</td>
+            <td><button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteRegistroEfectivo(${r.id})" title="Eliminar"><i class="bi bi-trash"></i></button></td>
+        </tr>`).join('');
+    }
+}
+
+function openRegistroEfectivoModal() {
+    document.getElementById('registro-socio').value = 'Alberto';
+    document.getElementById('registro-alumno').value = '';
+    document.getElementById('registro-cantidad').value = '';
+    document.getElementById('registro-nota').value = '';
+    new bootstrap.Modal(document.getElementById('registroEfectivoModal')).show();
+}
+
+async function saveRegistroEfectivo() {
+    const socio = document.getElementById('registro-socio').value;
+    const alumno = document.getElementById('registro-alumno').value.trim();
+    const cantidad = document.getElementById('registro-cantidad').value;
+    const nota = document.getElementById('registro-nota').value.trim();
+
+    if (!alumno) { alert('El nombre del alumno es obligatorio'); return; }
+    if (!cantidad || parseFloat(cantidad) <= 0) { alert('La cantidad es obligatoria'); return; }
+
+    if (!confirm(`Confirmar: ${socio} cobra ${parseFloat(cantidad).toFixed(2)} EUR de ${alumno}?`)) return;
+
+    await api('/api/registro-efectivo', { method: 'POST', body: {
+        socio, alumno_nombre: alumno, cantidad: parseFloat(cantidad), nota
+    }});
+
+    bootstrap.Modal.getInstance(document.getElementById('registroEfectivoModal')).hide();
+    loadSocios();
+}
+
+async function deleteRegistroEfectivo(id) {
+    if (!confirm('Eliminar este registro?')) return;
+    await api(`/api/registro-efectivo/${id}`, { method: 'DELETE' });
+    loadSocios();
 }
