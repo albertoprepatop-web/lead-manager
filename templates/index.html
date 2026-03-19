@@ -811,6 +811,41 @@
         </div>
     </div>
 
+    <!-- ═══════════════════ MODAL EDITAR ALUMNO ECONOMICA ═══════════════════ -->
+    <div class="modal fade" id="editAlumnoEcoModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Alumno</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-eco-alumno-id">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="edit-eco-nombre">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Forma de pago</label>
+                        <select class="form-select" id="edit-eco-metodo">
+                            <option value="efectivo">Efectivo</option>
+                            <option value="domiciliacion">Domiciliación</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Grupo</label>
+                        <input type="text" class="form-control" id="edit-eco-grupo">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto" onclick="deleteAlumnoEco()"><i class="bi bi-trash"></i></button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAlumnoEco()"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══════════════════ MODAL PEGAR TELEGRAM ═══════════════════ -->
     <div class="modal fade" id="telegramPasteModal" tabindex="-1">
         <div class="modal-dialog">

@@ -1064,7 +1064,10 @@ async function loadEconomica() {
                                     ? '<span class="badge bg-info">Domi</span>'
                                     : '<span class="badge bg-success">Efect.</span>';
                                 return `<tr>
-                                    <td class="fw-bold" style="font-size:0.85rem">${a.nombre}</td>
+                                    <td style="font-size:0.85rem">
+                                        <button class="btn btn-sm btn-link p-0 me-1 text-muted" onclick="openEditAlumnoEco(${a.id})" title="Editar"><i class="bi bi-pencil-square"></i></button>
+                                        <span class="fw-bold">${a.nombre}</span>
+                                    </td>
                                     <td>${tipoBadge}</td>
                                     ${meses.map(m => {
                                         const pago = a.pagos[m];
@@ -1188,6 +1191,38 @@ async function seedPrepatop() {
     } catch (e) {
         alert('Error: ' + e.message);
     }
+}
+
+async function openEditAlumnoEco(alumnoId) {
+    const alumno = await api(`/api/alumnos/${alumnoId}`);
+    document.getElementById('edit-eco-alumno-id').value = alumno.id;
+    document.getElementById('edit-eco-nombre').value = alumno.nombre;
+    document.getElementById('edit-eco-metodo').value = alumno.metodo_pago || 'efectivo';
+    document.getElementById('edit-eco-grupo').value = alumno.grupo || '';
+    new bootstrap.Modal(document.getElementById('editAlumnoEcoModal')).show();
+}
+
+async function saveAlumnoEco() {
+    const id = document.getElementById('edit-eco-alumno-id').value;
+    const nombre = document.getElementById('edit-eco-nombre').value.trim();
+    const metodo_pago = document.getElementById('edit-eco-metodo').value;
+    const grupo = document.getElementById('edit-eco-grupo').value.trim();
+
+    if (!nombre) { alert('El nombre es obligatorio'); return; }
+
+    await api(`/api/alumnos/${id}`, { method: 'PUT', body: { nombre, metodo_pago, grupo } });
+    bootstrap.Modal.getInstance(document.getElementById('editAlumnoEcoModal')).hide();
+    loadEconomica();
+}
+
+async function deleteAlumnoEco() {
+    const id = document.getElementById('edit-eco-alumno-id').value;
+    const nombre = document.getElementById('edit-eco-nombre').value;
+    if (!confirm(`¿Eliminar a ${nombre}? Esta acción no se puede deshacer.`)) return;
+
+    await api(`/api/alumnos/${id}`, { method: 'DELETE' });
+    bootstrap.Modal.getInstance(document.getElementById('editAlumnoEcoModal')).hide();
+    loadEconomica();
 }
 
 function openAddMesModal() {

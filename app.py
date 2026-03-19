@@ -104,7 +104,7 @@ def dashboard():
 
     total = Lead.query.count()
     nuevos_semana = Lead.query.filter(Lead.created_at >= week_ago).count()
-    total_alumnos = Alumno.query.count()
+    total_alumnos = Alumno.query.filter(db.or_(Alumno.grupo == '', Alumno.grupo.is_(None))).count()
     seguimientos_pendientes = Seguimiento.query.filter(
         Seguimiento.completado == False,
         Seguimiento.fecha <= now
@@ -117,7 +117,7 @@ def dashboard():
         por_estado = {}
         for estado in ESTADOS:
             por_estado[estado] = leads_academia.filter_by(estado=estado).count()
-        alumnos_ac = Alumno.query.filter_by(academia=academia).count()
+        alumnos_ac = Alumno.query.filter_by(academia=academia).filter(db.or_(Alumno.grupo == '', Alumno.grupo.is_(None))).count()
         por_academia[academia] = {
             'total': total_ac,
             'por_estado': por_estado,
@@ -444,6 +444,11 @@ def list_alumnos():
     if academia:
         query = query.filter_by(academia=academia)
 
+    # Exclude students managed in economic view (have grupo set) unless explicitly requested
+    include_gestion = request.args.get('include_gestion')
+    if not include_gestion:
+        query = query.filter(db.or_(Alumno.grupo == '', Alumno.grupo.is_(None)))
+
     busqueda = request.args.get('busqueda')
     if busqueda:
         pattern = f'%{busqueda}%'
@@ -476,7 +481,7 @@ def update_alumno(alumno_id):
     alumno = Alumno.query.get_or_404(alumno_id)
     data = request.get_json()
 
-    for field in ['nombre', 'telefono', 'email', 'especialidad', 'curso', 'modalidad', 'estado_pago', 'notas']:
+    for field in ['nombre', 'telefono', 'email', 'especialidad', 'curso', 'modalidad', 'estado_pago', 'notas', 'metodo_pago', 'grupo']:
         if field in data:
             setattr(alumno, field, data[field])
     if 'cuota' in data:
