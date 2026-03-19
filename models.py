@@ -98,6 +98,8 @@ class Alumno(db.Model):
     academia = db.Column(db.String(50), nullable=False)
     fecha_matricula = db.Column(db.DateTime, default=datetime.utcnow)
     especialidad = db.Column(db.String(100), default='')
+    grupo = db.Column(db.String(100), default='')  # e.g. "EF LUNES", "AL", "PT PRESENCIAL"
+    metodo_pago = db.Column(db.String(20), default='efectivo')  # efectivo / domiciliacion
     curso = db.Column(db.String(200), default='')
     modalidad = db.Column(db.String(20), default='presencial')
     estado_pago = db.Column(db.String(20), default='pendiente')
@@ -118,6 +120,8 @@ class Alumno(db.Model):
             'academia': self.academia,
             'fecha_matricula': self.fecha_matricula.isoformat() if self.fecha_matricula else None,
             'especialidad': self.especialidad,
+            'grupo': self.grupo,
+            'metodo_pago': self.metodo_pago,
             'curso': self.curso,
             'modalidad': self.modalidad,
             'estado_pago': self.estado_pago,

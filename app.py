@@ -33,14 +33,18 @@ def add_no_cache(response):
 with app.app_context():
     db.create_all()
     seed_database()
-    # Auto-migrate: add cuota column if missing
+    # Auto-migrate: add missing columns
     try:
         from sqlalchemy import text, inspect
         inspector = inspect(db.engine)
         columns = [c['name'] for c in inspector.get_columns('alumnos')]
         if 'cuota' not in columns:
             db.session.execute(text('ALTER TABLE alumnos ADD COLUMN cuota FLOAT DEFAULT 0'))
-            db.session.commit()
+        if 'grupo' not in columns:
+            db.session.execute(text("ALTER TABLE alumnos ADD COLUMN grupo VARCHAR(100) DEFAULT ''"))
+        if 'metodo_pago' not in columns:
+            db.session.execute(text("ALTER TABLE alumnos ADD COLUMN metodo_pago VARCHAR(20) DEFAULT 'efectivo'"))
+        db.session.commit()
     except Exception:
         db.session.rollback()
 
@@ -738,17 +742,36 @@ def gestion_economica():
             pagos_map[p.alumno_id] = {}
         pagos_map[p.alumno_id][p.mes] = p.to_dict()
 
-    # Build response
-    alumnos_data = []
+    # Group by grupo, sorted: efectivo first then domiciliacion
+    grupos = {}
+    grupo_order = ['EF LUNES', 'EF MARTES', 'EF MIÉRCOLES', 'EF JUEVES',
+                   'AL', 'INGLÉS', 'INFANTIL', 'PT PRESENCIAL', 'PRIMARIA', 'PT ONLINE', 'PT JÉSSICA 2 AÑOS']
     for a in alumnos:
-        alumnos_data.append({
+        g = a.grupo or a.especialidad or 'Sin grupo'
+        if g not in grupos:
+            grupos[g] = []
+        grupos[g].append({
             'id': a.id,
             'nombre': a.nombre,
             'especialidad': a.especialidad,
-            'curso': a.curso,
+            'grupo': g,
+            'metodo_pago': a.metodo_pago or 'efectivo',
             'cuota': a.cuota or 0,
             'pagos': pagos_map.get(a.id, {}),
         })
+
+    # Sort each group: efectivo first, then domiciliacion
+    for g in grupos:
+        grupos[g].sort(key=lambda x: (0 if x['metodo_pago'] == 'efectivo' else 1, x['nombre']))
+
+    # Order groups
+    ordered_grupos = []
+    for g in grupo_order:
+        if g in grupos:
+            ordered_grupos.append({'nombre': g, 'alumnos': grupos[g]})
+    for g in grupos:
+        if g not in grupo_order:
+            ordered_grupos.append({'nombre': g, 'alumnos': grupos[g]})
 
     # Totals per month
     totales = {}
@@ -759,7 +782,7 @@ def gestion_economica():
 
     return jsonify({
         'meses': meses_list,
-        'alumnos': alumnos_data,
+        'grupos': ordered_grupos,
         'totales': totales,
     })
 
@@ -866,6 +889,160 @@ def delete_registro_efectivo(registro_id):
     db.session.delete(registro)
     db.session.commit()
     return jsonify({'message': 'Registro eliminado'})
+
+
+@app.route('/api/seed-prepatop', methods=['POST'])
+@login_required
+def seed_prepatop():
+    """Seed PREPATOP students from the master Excel data."""
+    # Check if already seeded
+    existing = Alumno.query.filter_by(academia='PREPATOP').count()
+    if existing > 0:
+        return jsonify({'message': f'Ya hay {existing} alumnos de PREPATOP. No se importaron nuevos.', 'count': existing})
+
+    students = [
+        # EF LUNES
+        ('ANTONIO CARRASCO GUERRERO', 'EF', 'EF LUNES', 'efectivo'),
+        ('ADRIÁN VINAGRE CAÑADAS', 'EF', 'EF LUNES', 'efectivo'),
+        ('MANUEL LORENTE PESO', 'EF', 'EF LUNES', 'efectivo'),
+        ('DANIEL CEREZO DELGADO', 'EF', 'EF LUNES', 'efectivo'),
+        ('MIRIAM GUZMAN FERNÁNDEZ', 'EF', 'EF LUNES', 'efectivo'),
+        ('LAURA RODERO FERNÁNDEZ', 'EF', 'EF LUNES', 'efectivo'),
+        ('SERGIO LUQUE MARTÍN', 'EF', 'EF LUNES', 'efectivo'),
+        ('LUCÍA BARTOLOMÉ CABERO', 'EF', 'EF LUNES', 'domiciliacion'),
+        ('CARLOS ROMÁN HERNÁNDEZ', 'EF', 'EF LUNES', 'efectivo'),
+        ('MARÍA BEATRIZ REAL MOURELLE', 'EF', 'EF LUNES', 'efectivo'),
+        ('EMMA MARBÁN DE SALVADOR', 'EF', 'EF LUNES', 'efectivo'),
+        ('JORGE GARCÍA ALCONCHEL', 'EF', 'EF LUNES', 'efectivo'),
+        # EF MARTES
+        ('ESTHER PACHÓN VILLADA', 'EF', 'EF MARTES', 'efectivo'),
+        ('MIGUEL RUIZ FERNÁNDEZ', 'EF', 'EF MARTES', 'efectivo'),
+        ('MARÍA PALACIOS SÁNCHEZ', 'EF', 'EF MARTES', 'efectivo'),
+        ('ADRIÁN NIETO BAUTISTA', 'EF', 'EF MARTES', 'efectivo'),
+        ('GLORIA NAVARRO GONZÁLEZ', 'EF', 'EF MARTES', 'efectivo'),
+        ('NURIA CALERO CRUZ', 'EF', 'EF MARTES', 'efectivo'),
+        ('SERGIO ESTÉVEZ ACEDO', 'EF', 'EF MARTES', 'efectivo'),
+        ('ROSA MARÍA TORRES GÓMEZ', 'EF', 'EF MARTES', 'efectivo'),
+        ('GONZALO MOYA GÁLVEZ', 'EF', 'EF MARTES', 'efectivo'),
+        ('CAROLINA TROJACKI NOWAK', 'EF', 'EF MARTES', 'efectivo'),
+        # EF MIÉRCOLES
+        ('LAURA PINTADO PÉREZ', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('MARINA PUIG DEL CASTILLO', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('DAVID PELZER PEINADO', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('ÁNGEL GÓMEZ GARCÍA', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('ALEJANDRO RODRÍGUEZ CÓRDOBA', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('DANIEL MUÑOZ BAUTISTA', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('ALICIA DE LA ENCARNACIÓN CUENA', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('MIGUEL HERMIDA MUÑOZ', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('SAMUEL GARCÍLOPEZ SERRANO', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('MARIA TORRE GONZÁLEZ', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        ('ERIK MORALES COELLO', 'EF', 'EF MIÉRCOLES', 'efectivo'),
+        # EF JUEVES
+        ('CHEMA DÍAZ CAPILLA', 'EF', 'EF JUEVES', 'efectivo'),
+        ('ÁLVARO MESONERO ORTIZ', 'EF', 'EF JUEVES', 'efectivo'),
+        ('JAVIER GONZÁLEZ MATEO', 'EF', 'EF JUEVES', 'efectivo'),
+        ('DANIEL CHILLARÓN SERRANO', 'EF', 'EF JUEVES', 'efectivo'),
+        ('LAURA CRESPO VICENTE', 'EF', 'EF JUEVES', 'efectivo'),
+        ('PABLO MARÍN SÁNCHEZ', 'EF', 'EF JUEVES', 'efectivo'),
+        ('KAREN BUENO CASTRO', 'EF', 'EF JUEVES', 'efectivo'),
+        ('PABLO GARCÍA MÍNGUEZ', 'EF', 'EF JUEVES', 'domiciliacion'),
+        # AL
+        ('Ana Jiménez Montes', 'AL', 'AL', 'domiciliacion'),
+        ('Marta Almendros Candeleda', 'AL', 'AL', 'domiciliacion'),
+        ('Elena Ferrero Álvarez', 'AL', 'AL', 'domiciliacion'),
+        ('Irene Plaza López', 'AL', 'AL', 'efectivo'),
+        ('Beatriz Pérez López', 'AL', 'AL', 'domiciliacion'),
+        ('Marcos González Gómez', 'AL', 'AL', 'domiciliacion'),
+        ('Lola Sánchez Flórez', 'AL', 'AL', 'domiciliacion'),
+        ('MARTA CASABELLA SÁNCHEZ', 'AL', 'AL', 'domiciliacion'),
+        # INGLÉS
+        ('Paula Domingo Benito', 'Ingles', 'INGLÉS', 'efectivo'),
+        ('Sofía Faerna Campíñez', 'Ingles', 'INGLÉS', 'efectivo'),
+        ('María García Garcia', 'Ingles', 'INGLÉS', 'efectivo'),
+        ('Irene Martín Muñoz', 'Ingles', 'INGLÉS', 'domiciliacion'),
+        ('Andrea Cañizares Pereña', 'Ingles', 'INGLÉS', 'domiciliacion'),
+        ('Irene Checa Muñoz', 'Ingles', 'INGLÉS', 'efectivo'),
+        ('Estela Payo Molina', 'Ingles', 'INGLÉS', 'domiciliacion'),
+        ('Ruth Huertas Santos', 'Ingles', 'INGLÉS', 'efectivo'),
+        # INFANTIL
+        ('Natalia Isabel Gómez', 'Infantil', 'INFANTIL', 'efectivo'),
+        ('Noelia Bote Ramiro', 'Infantil', 'INFANTIL', 'domiciliacion'),
+        ('Paula Martínez Villa', 'Infantil', 'INFANTIL', 'efectivo'),
+        ('Sara Lopez Serrano', 'Infantil', 'INFANTIL', 'efectivo'),
+        ('Carlota Arteaga Garcia Cesto', 'Infantil', 'INFANTIL', 'domiciliacion'),
+        ('Vanesa (amiga de loly)', 'Infantil', 'INFANTIL', 'domiciliacion'),
+        ('ANA PASTOR LÓPEZ-PUIGCERDER', 'Infantil', 'INFANTIL', 'efectivo'),
+        ('Lorena Sol Hernández', 'Infantil', 'INFANTIL', 'efectivo'),
+        ('SOFÍA SÁNCHEZ VILLAHOZ', 'Infantil', 'INFANTIL', 'domiciliacion'),
+        ('LUCÍA PEDROCHE', 'Infantil', 'INFANTIL', 'domiciliacion'),
+        # PT PRESENCIAL
+        ('Andrea Gómez Medina', 'PT', 'PT PRESENCIAL', 'domiciliacion'),
+        ('Lara Timón Soto', 'PT', 'PT PRESENCIAL', 'efectivo'),
+        ('Laura López Fernández de la Puebla', 'PT', 'PT PRESENCIAL', 'domiciliacion'),
+        ('Noelia Murillo Pablo', 'PT', 'PT PRESENCIAL', 'efectivo'),
+        ('Lidia Martin Mata', 'PT', 'PT PRESENCIAL', 'domiciliacion'),
+        ('Adriana (Pablo)', 'PT', 'PT PRESENCIAL', 'domiciliacion'),
+        ('Julia García Rodríguez', 'PT', 'PT PRESENCIAL', 'domiciliacion'),
+        ('Shanon', 'PT', 'PT PRESENCIAL', 'domiciliacion'),
+        ('SAMUEL ADAN DIEZ', 'PT', 'PT PRESENCIAL', 'efectivo'),
+        ('Lorena Pérez Maldonado', 'PT', 'PT PRESENCIAL', 'domiciliacion'),
+        # PRIMARIA
+        ('Miguel Armero Sanchiz', 'Primaria', 'PRIMARIA', 'efectivo'),
+        ('Raquel Partido Lorenzo', 'Primaria', 'PRIMARIA', 'efectivo'),
+        ('María Bengoechea Gonzalo', 'Primaria', 'PRIMARIA', 'domiciliacion'),
+        ('Laura Rebollo Añover', 'Primaria', 'PRIMARIA', 'efectivo'),
+        ('Laura Conde Soriano', 'Primaria', 'PRIMARIA', 'efectivo'),
+        ('María del Sol Pedreira Pozo', 'Primaria', 'PRIMARIA', 'domiciliacion'),
+        ('María Lucía Pedreira Pozo', 'Primaria', 'PRIMARIA', 'domiciliacion'),
+        ('Lucía Haba Niso', 'Primaria', 'PRIMARIA', 'efectivo'),
+        ('Nuria Muinelo Morcillo', 'Primaria', 'PRIMARIA', 'domiciliacion'),
+        ('María Jesus Cecilia de la Iglesia', 'Primaria', 'PRIMARIA', 'efectivo'),
+        ('Noemi López García', 'Primaria', 'PRIMARIA', 'domiciliacion'),
+        ('Natalia Soto Tébar', 'Primaria', 'PRIMARIA', 'domiciliacion'),
+        ('YAIZA', 'Primaria', 'PRIMARIA', 'efectivo'),
+        # PT ONLINE
+        ('Gabriela Lastra Lapeña', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Marta González López', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Isabel Menéndez Méndez', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Irati Balza', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('María Briones Lázaro', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Rocío Méndez Elvira', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Alejandra Ramón Bermejo', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('María Calle González', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Marta Roldan Perez', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Mari Carmen Lopez Garcia Heras', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('NICOLE', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        ('Hugo Bermejo Martínez', 'PT Online', 'PT ONLINE', 'domiciliacion'),
+        # PT JÉSSICA 2 AÑOS
+        ('Nerea Gallardo Segado', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
+        ('María del Carmen Gómez Carmona', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
+        ('Lucia Olmos Higueras', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
+        ('Elena Bárcena Castresana', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
+        ('Cristina Jiménez Velasco', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
+        ('Ana Fernández Bosquet', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
+        ('CRISTINA PARRAL CAÑADA', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
+    ]
+
+    count = 0
+    for nombre, especialidad, grupo, metodo in students:
+        alumno = Alumno(
+            nombre=nombre.strip(),
+            academia='PREPATOP',
+            especialidad=especialidad,
+            grupo=grupo,
+            metodo_pago=metodo,
+            curso='Oposiciones',
+        )
+        db.session.add(alumno)
+        count += 1
+
+    # Also create the 3 months (April, May, June 2026)
+    for mes in ['2026-04', '2026-05', '2026-06']:
+        if not MesActivo.query.filter_by(mes=mes, academia='PREPATOP').first():
+            db.session.add(MesActivo(mes=mes, academia='PREPATOP'))
+
+    db.session.commit()
+    return jsonify({'message': f'{count} alumnos importados', 'count': count}), 201
 
 
 @app.route('/api/db-check')

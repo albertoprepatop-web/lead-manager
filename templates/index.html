@@ -215,6 +215,7 @@
             <div class="d-flex justify-content-between mb-2">
                 <div>
                     <button class="btn btn-sm btn-success" onclick="openLeadModal()"><i class="bi bi-plus-lg"></i> Nuevo Lead</button>
+                    <button class="btn btn-sm btn-info text-white" onclick="openTelegramPasteModal()"><i class="bi bi-telegram"></i> Pegar Telegram</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="exportCSV()"><i class="bi bi-download"></i> Exportar CSV</button>
                 </div>
                 <span class="text-muted" id="leads-count"></span>
@@ -339,20 +340,13 @@
         <div id="view-economica" style="display:none">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0" id="economica-title"><i class="bi bi-cash-stack"></i> Gestion Economica</h5>
-                <button class="btn btn-sm btn-primary" onclick="openAddMesModal()"><i class="bi bi-plus-lg"></i> Anadir Mes</button>
-            </div>
-            <div class="card">
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-sm mb-0" id="economica-table">
-                            <thead id="economica-thead"></thead>
-                            <tbody id="economica-tbody"></tbody>
-                            <tfoot id="economica-tfoot"></tfoot>
-                        </table>
-                    </div>
+                <div>
+                    <button class="btn btn-sm btn-primary" onclick="openAddMesModal()"><i class="bi bi-plus-lg"></i> Añadir Mes</button>
+                    <button class="btn btn-sm btn-outline-secondary ms-1" onclick="seedPrepatop()"><i class="bi bi-download"></i> Importar Alumnos</button>
                 </div>
             </div>
-            <div class="row g-3 mt-3" id="economica-totales"></div>
+            <div class="row g-3 mb-3" id="economica-totales"></div>
+            <div id="economica-grupos"></div>
         </div>
 
         <!-- ═══════════════════ SOCIOS ═══════════════════ -->
@@ -812,6 +806,41 @@
                     <button type="button" class="btn btn-outline-danger" id="btn-delete-pago" style="display:none" onclick="deletePago()"><i class="bi bi-trash"></i></button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-success" onclick="savePago()"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL PEGAR TELEGRAM ═══════════════════ -->
+    <div class="modal fade" id="telegramPasteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-telegram"></i> Pegar Lead de Telegram</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Academia *</label>
+                        <select class="form-select" id="telegram-academia">
+                            <option value="PREPATOP">PREPATOP</option>
+                            <option value="PREPARASECUNDARIA">PREPARASECUNDARIA</option>
+                            <option value="PREPARAANDALUCIA">PREPARAANDALUCIA</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Pega aquí el mensaje del bot *</label>
+                        <textarea class="form-control" id="telegram-texto" rows="6" placeholder="🚀 ¡Nuevo Lead! &#10;&#10;Nombre: ...&#10;Especialidad: ...&#10;Disponibilidad: ...&#10;Contacto: ..." oninput="parseTelegramPreview()"></textarea>
+                    </div>
+                    <div id="telegram-preview" class="d-none">
+                        <hr>
+                        <h6 class="fw-bold"><i class="bi bi-eye"></i> Vista previa</h6>
+                        <div id="telegram-preview-content"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info text-white" id="btn-telegram-crear" onclick="crearLeadTelegram()" disabled><i class="bi bi-plus-lg"></i> Crear Lead</button>
                 </div>
             </div>
         </div>

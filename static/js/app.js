@@ -363,6 +363,94 @@ function updateEspecialidadOptions(prefix) {
 }
 
 // ── Lead Modal (Create/Edit) ──────────────────────────────────────────────
+// ── Telegram Paste ───────────────────────────────────────────────────────
+function openTelegramPasteModal() {
+    document.getElementById('telegram-texto').value = '';
+    document.getElementById('telegram-preview').classList.add('d-none');
+    document.getElementById('btn-telegram-crear').disabled = true;
+    // Default academy to current if set
+    if (currentAcademia && !currentAcademia.startsWith('GESTION')) {
+        document.getElementById('telegram-academia').value = currentAcademia;
+    }
+    new bootstrap.Modal(document.getElementById('telegramPasteModal')).show();
+}
+
+function parseTelegramPreview() {
+    const texto = document.getElementById('telegram-texto').value;
+    const parsed = parseTelegramMessage(texto);
+    const preview = document.getElementById('telegram-preview');
+    const content = document.getElementById('telegram-preview-content');
+    const btn = document.getElementById('btn-telegram-crear');
+
+    if (parsed.nombre) {
+        preview.classList.remove('d-none');
+        content.innerHTML = `
+            <p class="mb-1"><strong>Nombre:</strong> ${parsed.nombre}</p>
+            <p class="mb-1"><strong>Especialidad:</strong> ${parsed.especialidad || '-'}</p>
+            <p class="mb-1"><strong>Teléfono:</strong> ${parsed.telefono || '-'}</p>
+        `;
+        btn.disabled = false;
+    } else {
+        preview.classList.add('d-none');
+        btn.disabled = true;
+    }
+}
+
+function parseTelegramMessage(texto) {
+    const result = { nombre: '', especialidad: '', telefono: '' };
+    const lines = texto.split('\n');
+    for (const line of lines) {
+        const l = line.trim();
+        if (l.toLowerCase().startsWith('nombre:')) {
+            result.nombre = l.substring(7).trim();
+        } else if (l.toLowerCase().startsWith('especialidad:')) {
+            result.especialidad = l.substring(13).trim();
+        } else if (l.toLowerCase().startsWith('disponibilidad:')) {
+            // Sometimes the phone is here
+            const val = l.substring(15).trim();
+            if (/\d{6,}/.test(val)) result.telefono = val;
+        } else if (l.toLowerCase().startsWith('contacto:')) {
+            let val = l.substring(9).trim();
+            // Remove "p:" prefix, "+" prefix
+            val = val.replace(/^p:/, '').replace(/^\+34/, '').trim();
+            if (/\d{6,}/.test(val)) result.telefono = val;
+        }
+    }
+    return result;
+}
+
+async function crearLeadTelegram() {
+    const texto = document.getElementById('telegram-texto').value;
+    const academia = document.getElementById('telegram-academia').value;
+    const parsed = parseTelegramMessage(texto);
+
+    if (!parsed.nombre) { alert('No se pudo extraer el nombre'); return; }
+    if (!confirm(`Crear lead: ${parsed.nombre} en ${academia}?`)) return;
+
+    // Map especialidad to proper format
+    const espMap = {
+        'infantil': 'Infantil', 'primaria': 'Primaria', 'ingles': 'Ingles', 'inglés': 'Ingles',
+        'pt': 'PT', 'pt online': 'PT Online', 'ef': 'EF', 'al': 'AL',
+        'tecnologia': 'Tecnologia', 'tecnología': 'Tecnologia', 'historia': 'Historia',
+        'lengua': 'Lengua', 'economia': 'Economia', 'economía': 'Economia',
+        'latin': 'Latin', 'latín': 'Latin', 'fyq': 'FyQ', 'filosofia': 'Filosofia',
+        'filosofía': 'Filosofia', 'musica': 'Musica', 'música': 'Musica',
+    };
+    const espNorm = espMap[parsed.especialidad.toLowerCase()] || parsed.especialidad;
+
+    await api('/api/leads', { method: 'POST', body: {
+        nombre: parsed.nombre,
+        telefono: parsed.telefono,
+        academia: academia,
+        especialidad: espNorm,
+        estado: 'nuevo',
+    }});
+
+    bootstrap.Modal.getInstance(document.getElementById('telegramPasteModal')).hide();
+    alert(`Lead "${parsed.nombre}" creado correctamente`);
+    loadLeads();
+}
+
 async function openLeadModal(id = null) {
     const modal = new bootstrap.Modal(document.getElementById('leadModal'));
     document.getElementById('leadModalTitle').textContent = id ? 'Editar Lead' : 'Nuevo Lead';
@@ -914,140 +1002,94 @@ async function loadEconomica() {
     if (!apiAcademia) return;
 
     const titleLabel = currentAcademia === 'GESTION_PREPATOP' ? 'PREPATOP 2025-2026' : apiAcademia;
-    document.getElementById('economica-title').innerHTML = `<i class="bi bi-cash-stack"></i> Gestion Economica - ${titleLabel}`;
+    document.getElementById('economica-title').innerHTML = `<i class="bi bi-cash-stack"></i> Gestión Económica - ${titleLabel}`;
 
     const data = await api(`/api/gestion-economica?academia=${apiAcademia}`);
     const meses = data.meses;
-    const allAlumnos = data.alumnos;
+    const grupos = data.grupos || [];
     const totales = data.totales;
-
-    // Group students: regular vs Jessica 2 years
-    const regularAlumnos = allAlumnos.filter(a => a.curso !== 'PT Jessica 2 Años');
-    const jessicaAlumnos = allAlumnos.filter(a => a.curso === 'PT Jessica 2 Años');
-
-    // Group regular students by especialidad
-    const groups = {};
-    for (const a of regularAlumnos) {
-        const esp = a.especialidad || 'Sin especialidad';
-        if (!groups[esp]) groups[esp] = [];
-        groups[esp].push(a);
-    }
-
-    function buildAlumnoRows(alumnos) {
-        return alumnos.map(a => `<tr>
-            <td class="fw-bold">${a.nombre}</td>
-            <td>${a.cuota ? a.cuota.toFixed(2) + ' EUR' : '-'}</td>
-            ${meses.map(m => {
-                const pago = a.pagos[m];
-                if (pago) {
-                    const metodoIcon = pago.metodo === 'efectivo' ? 'bi-cash' : 'bi-receipt';
-                    const metodoLabel = pago.metodo === 'efectivo' ? 'Efect.' : 'Recibo';
-                    const socioLabel = pago.recogido_por ? ` (${pago.recogido_por.charAt(0)})` : '';
-                    return `<td class="text-center">
-                        <button class="btn btn-sm btn-success w-100" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0}, ${pago.id})" title="Click para editar">
-                            <i class="bi ${metodoIcon}"></i> ${metodoLabel}${socioLabel}
-                        </button>
-                    </td>`;
-                } else {
-                    return `<td class="text-center">
-                        <button class="btn btn-sm btn-outline-danger w-100" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0})">
-                            <i class="bi bi-x-circle"></i> Pendiente
-                        </button>
-                    </td>`;
-                }
-            }).join('')}
-        </tr>`).join('');
-    }
-
-    // Build header
-    const thead = document.getElementById('economica-thead');
-    thead.innerHTML = `<tr>
-        <th style="min-width:200px">Alumno</th>
-        <th style="min-width:80px">Cuota</th>
-        ${meses.map(m => `<th class="text-center" style="min-width:120px">${formatMes(m)}</th>`).join('')}
-    </tr>`;
-
-    // Build body with groups
-    const tbody = document.getElementById('economica-tbody');
-    const colSpan = 2 + meses.length;
-
-    if (allAlumnos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted py-4">No hay alumnos en esta academia</td></tr>`;
-    } else {
-        let html = '';
-        // Specialty order
-        const espOrder = ['EF', 'AL', 'Ingles', 'Infantil', 'PT', 'Primaria', 'PT Online'];
-        const sortedKeys = espOrder.filter(k => groups[k]);
-        // Add any remaining keys
-        for (const k of Object.keys(groups)) {
-            if (!sortedKeys.includes(k)) sortedKeys.push(k);
-        }
-
-        for (const esp of sortedKeys) {
-            html += `<tr class="table-secondary"><td colspan="${colSpan}" class="fw-bold"><i class="bi bi-mortarboard"></i> ${esp} (${groups[esp].length})</td></tr>`;
-            html += buildAlumnoRows(groups[esp]);
-        }
-
-        // Jessica section
-        if (jessicaAlumnos.length > 0) {
-            html += `<tr class="table-warning"><td colspan="${colSpan}" class="fw-bold"><i class="bi bi-star"></i> PT Jessica - 2 Años (${jessicaAlumnos.length})</td></tr>`;
-            html += buildAlumnoRows(jessicaAlumnos);
-        }
-
-        tbody.innerHTML = html;
-    }
-
-    // Build footer with totals
-    const tfoot = document.getElementById('economica-tfoot');
-    if (meses.length > 0) {
-        tfoot.innerHTML = `
-            <tr class="table-warning fw-bold">
-                <td>Total Efectivo</td>
-                <td></td>
-                ${meses.map(m => `<td class="text-center">${(totales[m]?.efectivo || 0).toFixed(2)} EUR</td>`).join('')}
-            </tr>
-            <tr class="table-info fw-bold">
-                <td>Total Recibo</td>
-                <td></td>
-                ${meses.map(m => `<td class="text-center">${(totales[m]?.recibo || 0).toFixed(2)} EUR</td>`).join('')}
-            </tr>
-            <tr class="table-dark fw-bold">
-                <td>TOTAL</td>
-                <td></td>
-                ${meses.map(m => `<td class="text-center">${(totales[m]?.total || 0).toFixed(2)} EUR</td>`).join('')}
-            </tr>`;
-    } else {
-        tfoot.innerHTML = '';
-    }
 
     // Summary cards
     const totalEfectivo = Object.values(totales).reduce((sum, t) => sum + (t.efectivo || 0), 0);
     const totalRecibo = Object.values(totales).reduce((sum, t) => sum + (t.recibo || 0), 0);
     document.getElementById('economica-totales').innerHTML = `
-        <div class="col-md-4">
-            <div class="card border-success">
-                <div class="card-body text-center">
-                    <h6 class="text-success"><i class="bi bi-cash"></i> Total Efectivo</h6>
-                    <h3 class="fw-bold">${totalEfectivo.toFixed(2)} EUR</h3>
-                </div>
+        <div class="col-md-4"><div class="card border-success"><div class="card-body text-center py-2">
+            <small class="text-success"><i class="bi bi-cash"></i> Total Efectivo</small>
+            <h4 class="fw-bold mb-0">${totalEfectivo.toFixed(2)} €</h4>
+        </div></div></div>
+        <div class="col-md-4"><div class="card border-primary"><div class="card-body text-center py-2">
+            <small class="text-primary"><i class="bi bi-receipt"></i> Total Recibo</small>
+            <h4 class="fw-bold mb-0">${totalRecibo.toFixed(2)} €</h4>
+        </div></div></div>
+        <div class="col-md-4"><div class="card border-dark"><div class="card-body text-center py-2">
+            <small><i class="bi bi-wallet2"></i> Total General</small>
+            <h4 class="fw-bold mb-0">${(totalEfectivo + totalRecibo).toFixed(2)} €</h4>
+        </div></div></div>`;
+
+    // Render groups
+    const container = document.getElementById('economica-grupos');
+    if (grupos.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-5">No hay alumnos. Pulsa "Importar Alumnos" para cargar los datos.</div>';
+        return;
+    }
+
+    container.innerHTML = grupos.map((grupo, gi) => {
+        const efectivoCount = grupo.alumnos.filter(a => a.metodo_pago === 'efectivo').length;
+        const domiCount = grupo.alumnos.filter(a => a.metodo_pago === 'domiciliacion').length;
+        const totalAlumnos = grupo.alumnos.length;
+
+        return `<div class="card mb-2">
+            <div class="card-header p-0">
+                <button class="btn btn-link w-100 text-start text-decoration-none p-2 d-flex justify-content-between align-items-center"
+                        type="button" data-bs-toggle="collapse" data-bs-target="#grupo-${gi}">
+                    <span class="fw-bold"><i class="bi bi-mortarboard"></i> ${grupo.nombre} <span class="badge bg-dark">${totalAlumnos}</span></span>
+                    <span>
+                        <span class="badge bg-success">${efectivoCount} efect.</span>
+                        <span class="badge bg-info">${domiCount} domi.</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </span>
+                </button>
             </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-primary">
-                <div class="card-body text-center">
-                    <h6 class="text-primary"><i class="bi bi-receipt"></i> Total Recibo</h6>
-                    <h3 class="fw-bold">${totalRecibo.toFixed(2)} EUR</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-dark">
-                <div class="card-body text-center">
-                    <h6><i class="bi bi-wallet2"></i> Total General</h6>
-                    <h3 class="fw-bold">${(totalEfectivo + totalRecibo).toFixed(2)} EUR</h3>
+            <div class="collapse" id="grupo-${gi}">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead><tr>
+                                <th style="min-width:200px">Alumno</th>
+                                <th style="width:70px">Tipo</th>
+                                ${meses.map(m => `<th class="text-center" style="min-width:90px">${formatMes(m)}</th>`).join('')}
+                            </tr></thead>
+                            <tbody>${grupo.alumnos.map(a => {
+                                const tipoBadge = a.metodo_pago === 'domiciliacion'
+                                    ? '<span class="badge bg-info">Domi</span>'
+                                    : '<span class="badge bg-success">Efect.</span>';
+                                return `<tr>
+                                    <td class="fw-bold" style="font-size:0.85rem">${a.nombre}</td>
+                                    <td>${tipoBadge}</td>
+                                    ${meses.map(m => {
+                                        const pago = a.pagos[m];
+                                        if (pago) {
+                                            return `<td class="text-center">
+                                                <button class="btn btn-sm btn-success px-2 py-0" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0}, ${pago.id})" title="Pagado - Click para editar">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </td>`;
+                                        } else {
+                                            return `<td class="text-center">
+                                                <button class="btn btn-sm btn-outline-secondary px-2 py-0" onclick="openPagoModal(${a.id}, '${m}', ${a.cuota || 0})" title="Pendiente - Click para pagar">
+                                                    <i class="bi bi-square"></i>
+                                                </button>
+                                            </td>`;
+                                        }
+                                    }).join('')}
+                                </tr>`;
+                            }).join('')}</tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>`;
+    }).join('');
 }
 
 function openPagoModal(alumnoId, mes, cuota, pagoId = null) {
@@ -1135,6 +1177,17 @@ async function deletePago() {
     await api(`/api/pagos/${pagoId}`, { method: 'DELETE' });
     bootstrap.Modal.getInstance(document.getElementById('pagoModal')).hide();
     loadEconomica();
+}
+
+async function seedPrepatop() {
+    if (!confirm('Importar todos los alumnos de PREPATOP del Excel? (Solo funciona si no hay alumnos ya)')) return;
+    try {
+        const res = await api('/api/seed-prepatop', { method: 'POST' });
+        alert(res.message);
+        loadEconomica();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
 }
 
 function openAddMesModal() {
