@@ -1012,6 +1012,7 @@ async function loadPipeline() {
                     <span class="badge badge-${l.academia.toLowerCase()}" style="font-size:0.65rem">${l.academia}</span>
                 </div>
                 ${l.telefono ? `<div class="lead-meta mt-1"><i class="bi bi-telephone"></i> ${l.telefono}</div>` : ''}
+                ${l.llamadas > 0 ? `<div class="lead-meta mt-1"><i class="bi bi-telephone-outbound text-primary"></i> <small>${l.llamadas} llamada${l.llamadas > 1 ? 's' : ''}</small></div>` : ''}
                 ${l.fecha_cita ? `<div class="lead-meta mt-1 text-warning"><i class="bi bi-calendar-event"></i> ${formatDate(l.fecha_cita)}</div>` : ''}
             </div>
         `).join('');

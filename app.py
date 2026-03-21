@@ -261,7 +261,12 @@ def list_leads():
         query = query.order_by(Lead.created_at.desc())
 
     leads = query.all()
-    return jsonify([l.to_dict() for l in leads])
+    result = []
+    for l in leads:
+        d = l.to_dict()
+        d['llamadas'] = NotaActividad.query.filter_by(lead_id=l.id, tipo='llamada').count()
+        result.append(d)
+    return jsonify(result)
 
 
 @app.route('/api/leads', methods=['POST'])
