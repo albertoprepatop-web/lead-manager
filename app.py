@@ -921,6 +921,29 @@ def delete_registro_efectivo(registro_id):
     return jsonify({'message': 'Registro eliminado'})
 
 
+@app.route('/api/bulk-set-domiciliacion', methods=['POST'])
+@login_required
+def bulk_set_domiciliacion():
+    """Set metodo_pago='domiciliacion' for students matching names."""
+    data = request.get_json()
+    names = data.get('names', [])
+    updated = []
+    not_found = []
+    for name in names:
+        # Case-insensitive match
+        alumno = Alumno.query.filter(
+            Alumno.academia == 'PREPATOP',
+            db.func.lower(Alumno.nombre) == name.strip().lower()
+        ).first()
+        if alumno:
+            alumno.metodo_pago = 'domiciliacion'
+            updated.append(alumno.nombre)
+        else:
+            not_found.append(name)
+    db.session.commit()
+    return jsonify({'updated': updated, 'not_found': not_found})
+
+
 @app.route('/api/seed-prepatop', methods=['POST'])
 @login_required
 def seed_prepatop():
