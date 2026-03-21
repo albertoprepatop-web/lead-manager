@@ -195,6 +195,12 @@ def dashboard():
         Pago.metodo == 'recibo',
     ).scalar() or 0
 
+    # Citas agendadas (hemos_quedado con fecha_cita)
+    citas = Lead.query.filter(
+        Lead.estado == 'hemos_quedado',
+        Lead.fecha_cita.isnot(None),
+    ).order_by(Lead.fecha_cita.asc()).all()
+
     return jsonify({
         'total_leads': total,
         'nuevos_semana': nuevos_semana,
@@ -205,6 +211,7 @@ def dashboard():
         'alumnos_por_mes': alumnos_por_mes,
         'por_especialidad': por_especialidad,
         'seguimientos_proximos': [s.to_dict() for s in seguimientos_proximos],
+        'citas': [{'id': c.id, 'nombre': c.nombre, 'academia': c.academia, 'fecha_cita': c.fecha_cita.isoformat(), 'telefono': c.telefono} for c in citas],
         'prepatop_2526': {
             'alumnos': total_alumnos_2526,
             'efectivo': pagos_efectivo_2526,

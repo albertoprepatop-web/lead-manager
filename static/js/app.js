@@ -154,6 +154,29 @@ async function loadDashboard() {
     if (data.alumnos_por_mes) renderChartAlumnosMes(data.alumnos_por_mes);
     if (data.por_especialidad) renderChartsEspecialidad(data.por_especialidad);
 
+    // Citas agendadas
+    const citasCard = document.getElementById('card-citas');
+    const citasTbody = document.getElementById('dashboard-citas');
+    if (data.citas && data.citas.length > 0) {
+        citasCard.style.display = 'block';
+        citasTbody.innerHTML = data.citas.map(c => {
+            const fecha = new Date(c.fecha_cita);
+            const now = new Date();
+            const isToday = fecha.toDateString() === now.toDateString();
+            const isPast = fecha < now;
+            const rowClass = isToday ? 'table-warning fw-bold' : isPast ? 'table-danger' : '';
+            const icon = isToday ? '<i class="bi bi-exclamation-circle-fill text-warning me-1"></i>' : isPast ? '<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>' : '';
+            return `<tr class="${rowClass}">
+                <td>${icon}${formatDate(c.fecha_cita)}</td>
+                <td><a href="#" onclick="openLeadDetail(${c.id}); return false;">${c.nombre}</a></td>
+                <td><span class="badge badge-${c.academia.toLowerCase()}">${c.academia}</span></td>
+                <td>${c.telefono || '-'}</td>
+            </tr>`;
+        }).join('');
+    } else {
+        citasCard.style.display = 'none';
+    }
+
     const tbody = document.getElementById('dashboard-seguimientos');
     if (data.seguimientos_proximos.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No hay seguimientos pendientes</td></tr>';
@@ -306,9 +329,10 @@ async function loadLeads() {
     }
 
     const showAcademia = !currentAcademia;
-    tbody.innerHTML = leads.map(l => `
-        <tr>
-            <td><a href="#" onclick="openLeadDetail(${l.id}); return false;" class="fw-bold text-decoration-none">${l.nombre}</a></td>
+    tbody.innerHTML = leads.map(l => {
+        const citaInfo = l.fecha_cita ? `<br><small class="text-warning"><i class="bi bi-calendar-event"></i> Cita: ${formatDate(l.fecha_cita)}</small>` : '';
+        return `<tr ${l.estado === 'hemos_quedado' ? 'style="background-color:#fff8e1"' : ''}>
+            <td><a href="#" onclick="openLeadDetail(${l.id}); return false;" class="fw-bold text-decoration-none">${l.nombre}</a>${citaInfo}</td>
             <td>${l.telefono || '-'}</td>
             <td>${l.email || '-'}</td>
             <td>${showAcademia ? `<span class="badge badge-${l.academia.toLowerCase()}">${l.academia}</span>` : ''}</td>
@@ -322,8 +346,8 @@ async function loadLeads() {
                 <button class="btn btn-sm btn-outline-primary btn-action" onclick="openLeadModal(${l.id})" title="Editar"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger btn-action" onclick="confirmDeleteLead(${l.id})" title="Eliminar"><i class="bi bi-trash"></i></button>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function clearFilters() {
@@ -562,6 +586,7 @@ async function openLeadDetail(id) {
         <div class="mb-1"><i class="bi bi-building me-2"></i><span class="badge badge-${lead.academia.toLowerCase()}">${lead.academia}</span></div>
         ${lead.especialidad ? `<div class="mb-1"><i class="bi bi-mortarboard me-2"></i>Especialidad: ${lead.especialidad}</div>` : ''}
         ${lead.fecha_contacto ? `<div class="mb-1"><i class="bi bi-telephone-forward me-2"></i>Contactado: ${formatDate(lead.fecha_contacto)}</div>` : ''}
+        ${lead.fecha_cita ? `<div class="mb-1 text-warning fw-bold"><i class="bi bi-calendar-event me-2"></i>Cita: ${formatDate(lead.fecha_cita)}</div>` : ''}
         <div class="mb-1"><i class="bi bi-clock me-2"></i>Creado: ${formatDate(lead.created_at)}</div>
         ${lead.notas ? `<div class="mt-2 p-2 bg-light rounded"><small>${lead.notas}</small></div>` : ''}
     `;
