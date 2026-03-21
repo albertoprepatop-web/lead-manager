@@ -924,20 +924,36 @@ def delete_registro_efectivo(registro_id):
 @app.route('/api/bulk-set-domiciliacion', methods=['POST'])
 @login_required
 def bulk_set_domiciliacion():
-    """Set metodo_pago='domiciliacion' for students matching names."""
+    """Set metodo_pago='domiciliacion' for students matching names (accent-insensitive)."""
+    import unicodedata
+
+    def normalize(s):
+        """Remove accents and lowercase."""
+        nfkd = unicodedata.normalize('NFKD', s)
+        return ''.join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
+
     data = request.get_json()
     names = data.get('names', [])
+
+    # Get all PREPATOP students with grupo set (25/26)
+    alumnos = Alumno.query.filter(
+        Alumno.academia == 'PREPATOP',
+        Alumno.grupo != '',
+        Alumno.grupo.isnot(None)
+    ).all()
+
+    # Build normalized lookup
+    alumno_map = {}
+    for a in alumnos:
+        alumno_map[normalize(a.nombre)] = a
+
     updated = []
     not_found = []
     for name in names:
-        # Case-insensitive match
-        alumno = Alumno.query.filter(
-            Alumno.academia == 'PREPATOP',
-            db.func.lower(Alumno.nombre) == name.strip().lower()
-        ).first()
-        if alumno:
-            alumno.metodo_pago = 'domiciliacion'
-            updated.append(alumno.nombre)
+        norm = normalize(name)
+        if norm in alumno_map:
+            alumno_map[norm].metodo_pago = 'domiciliacion'
+            updated.append(alumno_map[norm].nombre)
         else:
             not_found.append(name)
     db.session.commit()
