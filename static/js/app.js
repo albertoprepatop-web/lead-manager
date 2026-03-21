@@ -376,6 +376,7 @@ async function quickChangeEstado(id, estado) {
         return;
     }
     await api(`/api/leads/${id}`, { method: 'PUT', body: { estado } });
+    refreshCurrentView();
 }
 
 function exportCSV() {
@@ -646,6 +647,7 @@ async function changeLeadEstado() {
     }
     await api(`/api/leads/${currentLeadId}`, { method: 'PUT', body: { estado } });
     openLeadDetail(currentLeadId);
+    refreshCurrentView();
 }
 
 async function confirmHemosQuedado() {
@@ -996,7 +998,7 @@ async function loadPipeline() {
         : `<i class="bi bi-kanban"></i> Pipeline de Ventas`;
 
     const leads = await api(`/api/leads${params}`);
-    const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'a_espera_de_pago', 'matriculado', 'perdido'];
+    const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'hemos_quedado', 'a_espera_de_pago', 'matriculado', 'perdido'];
 
     for (const estado of estados) {
         const container = document.getElementById(`pipeline-${estado}`);
@@ -1010,6 +1012,7 @@ async function loadPipeline() {
                     <span class="badge badge-${l.academia.toLowerCase()}" style="font-size:0.65rem">${l.academia}</span>
                 </div>
                 ${l.telefono ? `<div class="lead-meta mt-1"><i class="bi bi-telephone"></i> ${l.telefono}</div>` : ''}
+                ${l.fecha_cita ? `<div class="lead-meta mt-1 text-warning"><i class="bi bi-calendar-event"></i> ${formatDate(l.fecha_cita)}</div>` : ''}
             </div>
         `).join('');
 
