@@ -1038,6 +1038,16 @@ function dragEnd(event) { event.target.classList.remove('dragging'); }
 async function dropLead(event, estado) {
     event.preventDefault();
     if (draggedLeadId) {
+        if (estado === 'hemos_quedado') {
+            quickChangeEstado(draggedLeadId, 'hemos_quedado');
+            draggedLeadId = null;
+            return;
+        }
+        if (estado === 'contactado') {
+            quickChangeEstado(draggedLeadId, 'contactado');
+            draggedLeadId = null;
+            return;
+        }
         await api(`/api/leads/${draggedLeadId}`, { method: 'PUT', body: { estado } });
         draggedLeadId = null;
         loadPipeline();
