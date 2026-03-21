@@ -58,7 +58,11 @@ function switchAcademia(academia) {
     });
 
     // Show correct sub-tabs
-    if (academia === 'GESTION_PREPATOP') {
+    if (academia === 'SOCIOS') {
+        document.getElementById('subtabs-general').style.display = 'none';
+        document.getElementById('subtabs-academia').style.display = 'none';
+        showView('socios');
+    } else if (academia === 'GESTION_PREPATOP') {
         document.getElementById('subtabs-general').style.display = 'none';
         document.getElementById('subtabs-academia').style.display = 'none';
         showView('economica');
@@ -1147,8 +1151,7 @@ function openPagoModal(alumnoId, mes, cuota, pagoId = null) {
 }
 
 function toggleRecogidoPor() {
-    const metodo = document.getElementById('pago-metodo').value;
-    document.getElementById('pago-recogido-group').style.display = metodo === 'efectivo' ? 'block' : 'none';
+    // No-op: recogido_por removed from UI
 }
 
 async function savePago() {
@@ -1254,41 +1257,65 @@ async function saveNewMes() {
 // ── Socios ───────────────────────────────────────────────────────────────
 async function loadSocios() {
     const data = await api('/api/socios');
-    const { socios, registros } = data;
-    const totalGeneral = Object.values(socios).reduce((sum, s) => sum + s.total, 0);
+    const { socios, registros, efectivo_esperado } = data;
 
-    // Totals cards
-    document.getElementById('socios-totales').innerHTML = Object.entries(socios).map(([nombre, info]) => {
-        const pct = totalGeneral > 0 ? ((info.total / totalGeneral) * 100).toFixed(1) : 0;
-        return `<div class="col-md-4">
+    const alberto = socios.Alberto?.total || 0;
+    const esteban = socios.Esteban?.total || 0;
+    const totalCobrado = alberto + esteban;
+    const esperado = efectivo_esperado || 0;
+    const descuadre = esperado - totalCobrado;
+    const diferencial = alberto - esteban;
+
+    const descuadreColor = descuadre === 0 ? 'text-success' : 'text-danger';
+    const descuadreIcon = descuadre === 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
+    const difColor = diferencial === 0 ? 'text-muted' : (diferencial > 0 ? 'text-primary' : 'text-warning');
+
+    document.getElementById('socios-resumen').innerHTML = `
+        <div class="col-md-3">
             <div class="card border-dark">
-                <div class="card-body text-center">
-                    <h6 class="fw-bold"><i class="bi bi-person-circle"></i> ${nombre}</h6>
-                    <h3 class="fw-bold text-success">${info.total.toFixed(2)} EUR</h3>
-                    <small class="text-muted">${pct}% del total</small>
+                <div class="card-body text-center py-2">
+                    <small class="fw-bold"><i class="bi bi-person-circle"></i> Alberto</small>
+                    <h4 class="fw-bold text-success mb-0">${alberto.toFixed(2)} €</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-dark">
+                <div class="card-body text-center py-2">
+                    <small class="fw-bold"><i class="bi bi-person-circle"></i> Esteban</small>
+                    <h4 class="fw-bold text-success mb-0">${esteban.toFixed(2)} €</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center py-2">
+                    <small class="fw-bold ${difColor}"><i class="bi bi-arrow-left-right"></i> Diferencial</small>
+                    <h4 class="fw-bold mb-0 ${difColor}">${diferencial > 0 ? '+' : ''}${diferencial.toFixed(2)} €</h4>
+                    <small class="text-muted">${diferencial > 0 ? 'Alberto lleva más' : diferencial < 0 ? 'Esteban lleva más' : 'Igualados'}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card ${descuadre === 0 ? 'border-success' : 'border-danger'}">
+                <div class="card-body text-center py-2">
+                    <small class="fw-bold ${descuadreColor}"><i class="bi ${descuadreIcon}"></i> Descuadre</small>
+                    <h4 class="fw-bold mb-0 ${descuadreColor}">${descuadre.toFixed(2)} €</h4>
+                    <small class="text-muted">Esperado: ${esperado.toFixed(2)} € | Cobrado: ${totalCobrado.toFixed(2)} €</small>
                 </div>
             </div>
         </div>`;
-    }).join('') + `<div class="col-md-4">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <h6 class="fw-bold"><i class="bi bi-wallet2"></i> Total</h6>
-                <h3 class="fw-bold">${totalGeneral.toFixed(2)} EUR</h3>
-            </div>
-        </div>
-    </div>`;
 
     // Ledger table
     const tbody = document.getElementById('socios-registro');
     if (registros.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No hay cobros registrados</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No hay cobros registrados</td></tr>';
     } else {
         tbody.innerHTML = registros.map(r => `<tr>
             <td class="text-muted" style="font-size:0.8rem">${formatDate(r.created_at)}</td>
             <td><span class="badge bg-dark">${r.socio}</span></td>
-            <td class="fw-bold">${r.alumno_nombre}</td>
-            <td>${r.nota || '-'}</td>
-            <td class="fw-bold text-success">${r.cantidad.toFixed(2)} EUR</td>
+            <td>${r.nota || r.alumno_nombre || '-'}</td>
+            <td class="fw-bold text-success">${r.cantidad.toFixed(2)} €</td>
             <td><button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteRegistroEfectivo(${r.id})" title="Eliminar"><i class="bi bi-trash"></i></button></td>
         </tr>`).join('');
     }
@@ -1296,7 +1323,6 @@ async function loadSocios() {
 
 function openRegistroEfectivoModal() {
     document.getElementById('registro-socio').value = 'Alberto';
-    document.getElementById('registro-alumno').value = '';
     document.getElementById('registro-cantidad').value = '';
     document.getElementById('registro-nota').value = '';
     new bootstrap.Modal(document.getElementById('registroEfectivoModal')).show();
@@ -1304,17 +1330,15 @@ function openRegistroEfectivoModal() {
 
 async function saveRegistroEfectivo() {
     const socio = document.getElementById('registro-socio').value;
-    const alumno = document.getElementById('registro-alumno').value.trim();
     const cantidad = document.getElementById('registro-cantidad').value;
     const nota = document.getElementById('registro-nota').value.trim();
 
-    if (!alumno) { alert('El nombre del alumno es obligatorio'); return; }
     if (!cantidad || parseFloat(cantidad) <= 0) { alert('La cantidad es obligatoria'); return; }
 
-    if (!confirm(`Confirmar: ${socio} cobra ${parseFloat(cantidad).toFixed(2)} EUR de ${alumno}?`)) return;
+    if (!confirm(`Confirmar: ${socio} registra ${parseFloat(cantidad).toFixed(2)} €?`)) return;
 
     await api('/api/registro-efectivo', { method: 'POST', body: {
-        socio, alumno_nombre: alumno, cantidad: parseFloat(cantidad), nota
+        socio, alumno_nombre: nota || socio, cantidad: parseFloat(cantidad), nota
     }});
 
     bootstrap.Modal.getInstance(document.getElementById('registroEfectivoModal')).hide();

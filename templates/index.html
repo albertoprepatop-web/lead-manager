@@ -31,6 +31,9 @@
         <button class="academy-tab" style="background:#7C3AED; color:white;" data-academia="GESTION_PREPATOP" onclick="switchAcademia('GESTION_PREPATOP')">
             <i class="bi bi-cash-stack"></i> PREPATOP 25-26
         </button>
+        <button class="academy-tab" style="background:#0D6EFD; color:white;" data-academia="SOCIOS" onclick="switchAcademia('SOCIOS')">
+            <i class="bi bi-people-fill"></i> Socios
+        </button>
     </div>
 
     <!-- ═══ SUB NAV ═══ -->
@@ -40,7 +43,6 @@
             <button class="sub-tab active" onclick="showView('dashboard')"><i class="bi bi-speedometer2"></i> Dashboard</button>
             <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Todos los Alumnos</button>
             <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
-            <button class="sub-tab" onclick="showView('socios')"><i class="bi bi-people-fill"></i> Socios</button>
         </div>
         <!-- Academy sub-tabs (hidden by default) -->
         <div class="sub-tab-group" id="subtabs-academia" style="display:none">
@@ -388,12 +390,14 @@
                 <h5 class="mb-0"><i class="bi bi-people-fill"></i> Cuaderno de Efectivo - Socios</h5>
                 <button class="btn btn-sm btn-success" onclick="openRegistroEfectivoModal()"><i class="bi bi-plus-lg"></i> Registrar Cobro</button>
             </div>
-            <div class="row g-3 mb-4" id="socios-totales"></div>
+            <!-- Descuadre + Totales -->
+            <div class="row g-3 mb-3" id="socios-resumen"></div>
+            <!-- Registro -->
             <div class="card">
                 <div class="card-header fw-bold"><i class="bi bi-journal-text"></i> Registro de Cobros en Efectivo</div>
                 <div class="card-body p-0">
                     <table class="table table-hover table-sm mb-0">
-                        <thead><tr><th>Fecha</th><th>Socio</th><th>Alumno</th><th>Mes</th><th>Cantidad</th><th></th></tr></thead>
+                        <thead><tr><th>Fecha</th><th>Socio</th><th>Concepto</th><th>Cantidad</th><th></th></tr></thead>
                         <tbody id="socios-registro"></tbody>
                     </table>
                 </div>
@@ -827,13 +831,7 @@
                         <label class="form-label">Cantidad (EUR) *</label>
                         <input type="number" class="form-control" id="pago-cantidad" step="0.01" min="0">
                     </div>
-                    <div class="mb-3" id="pago-recogido-group">
-                        <label class="form-label">Recogido por *</label>
-                        <select class="form-select" id="pago-recogido">
-                            <option value="Alberto">Alberto</option>
-                            <option value="Esteban">Esteban</option>
-                        </select>
-                    </div>
+                    <input type="hidden" id="pago-recogido" value="">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-danger" id="btn-delete-pago" style="display:none" onclick="deletePago()"><i class="bi bi-trash"></i></button>
@@ -931,16 +929,12 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Alumno *</label>
-                        <input type="text" class="form-control" id="registro-alumno" placeholder="Nombre del alumno">
-                    </div>
-                    <div class="mb-3">
                         <label class="form-label">Cantidad (EUR) *</label>
                         <input type="number" class="form-control" id="registro-cantidad" step="0.01" min="0">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Concepto / Nota</label>
-                        <input type="text" class="form-control" id="registro-nota" placeholder="Ej: Pago abril EF">
+                        <input type="text" class="form-control" id="registro-nota" placeholder="Ej: Cobro abril EF lunes">
                     </div>
                 </div>
                 <div class="modal-footer">

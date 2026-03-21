@@ -884,9 +884,19 @@ def socios():
         total = sum(r.cantidad for r in registros_socio)
         socios_data[socio] = {'total': total}
 
+    # Calculate expected cash: count of efectivo payments * 180
+    efectivo_pagos = Pago.query.join(Alumno).filter(
+        Alumno.academia == 'PREPATOP',
+        Alumno.grupo != '',
+        Alumno.grupo.isnot(None),
+        Pago.metodo == 'efectivo',
+    ).count()
+    efectivo_esperado = efectivo_pagos * 180
+
     return jsonify({
         'socios': socios_data,
         'registros': [r.to_dict() for r in registros],
+        'efectivo_esperado': efectivo_esperado,
     })
 
 
