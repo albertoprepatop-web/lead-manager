@@ -958,6 +958,49 @@ def bulk_set_domiciliacion():
     return jsonify({'updated': updated, 'not_found': not_found})
 
 
+@app.route('/api/reset-prepatop-2526', methods=['POST'])
+@login_required
+def reset_prepatop_2526():
+    """Delete all PREPATOP students with grupo set, then reimport from JSON body."""
+    data = request.get_json()
+    students = data.get('students', [])
+
+    # Delete all current PREPATOP students with grupo
+    Alumno.query.filter(
+        Alumno.academia == 'PREPATOP',
+        Alumno.grupo != '',
+        Alumno.grupo.isnot(None)
+    ).delete(synchronize_session='fetch')
+
+    # Also delete those without grupo (old imports)
+    Alumno.query.filter(
+        Alumno.academia == 'PREPATOP',
+        db.or_(Alumno.grupo == '', Alumno.grupo.is_(None))
+    ).delete(synchronize_session='fetch')
+
+    # Import new students
+    count = 0
+    for s in students:
+        alumno = Alumno(
+            nombre=s['nombre'].strip(),
+            academia='PREPATOP',
+            especialidad=s.get('especialidad', ''),
+            grupo=s.get('grupo', ''),
+            metodo_pago=s.get('metodo_pago', 'efectivo'),
+            curso='Oposiciones',
+        )
+        db.session.add(alumno)
+        count += 1
+
+    # Ensure months exist
+    for mes in ['2026-04', '2026-05', '2026-06']:
+        if not MesActivo.query.filter_by(mes=mes, academia='PREPATOP').first():
+            db.session.add(MesActivo(mes=mes, academia='PREPATOP'))
+
+    db.session.commit()
+    return jsonify({'deleted': 'all', 'imported': count})
+
+
 @app.route('/api/fix-grupos', methods=['POST'])
 @login_required
 def fix_grupos():
