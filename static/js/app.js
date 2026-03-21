@@ -16,7 +16,7 @@ const ACADEMIA_COLORS = {
 
 const ESTADO_LABELS = {
     nuevo: 'Nuevo',
-    contactado: 'Contactado',
+    contactado: 'WhatsApp sin respuesta',
     no_coge: 'No Coge',
     interesado: 'Interesado',
     hemos_quedado: 'Hemos Quedado',
