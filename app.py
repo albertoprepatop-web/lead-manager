@@ -935,11 +935,9 @@ def bulk_set_domiciliacion():
     data = request.get_json()
     names = data.get('names', [])
 
-    # Get all PREPATOP students with grupo set (25/26)
+    # Get all PREPATOP students
     alumnos = Alumno.query.filter(
         Alumno.academia == 'PREPATOP',
-        Alumno.grupo != '',
-        Alumno.grupo.isnot(None)
     ).all()
 
     # Build normalized lookup
@@ -960,16 +958,37 @@ def bulk_set_domiciliacion():
     return jsonify({'updated': updated, 'not_found': not_found})
 
 
-@app.route('/api/seed-prepatop', methods=['POST'])
+@app.route('/api/fix-grupos', methods=['POST'])
 @login_required
-def seed_prepatop():
-    """Seed PREPATOP students from the master Excel data."""
-    # Check if already seeded
-    existing = Alumno.query.filter_by(academia='PREPATOP').count()
-    if existing > 0:
-        return jsonify({'message': f'Ya hay {existing} alumnos de PREPATOP. No se importaron nuevos.', 'count': existing})
+def fix_grupos():
+    """Fix grupo field for students that were imported before grupo was added."""
+    import unicodedata
 
-    students = [
+    def normalize(s):
+        nfkd = unicodedata.normalize('NFKD', s)
+        return ''.join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
+
+    # Build name->grupo+metodo mapping from seed data
+    name_to_info = {}
+    for nombre, esp, grupo, metodo in PREPATOP_SEED_DATA:
+        name_to_info[normalize(nombre)] = (grupo, metodo)
+
+    alumnos = Alumno.query.filter_by(academia='PREPATOP').all()
+    updated = 0
+    for a in alumnos:
+        norm = normalize(a.nombre)
+        if norm in name_to_info:
+            grupo, metodo = name_to_info[norm]
+            if not a.grupo or a.grupo == '':
+                a.grupo = grupo
+            if not a.metodo_pago or a.metodo_pago == 'efectivo':
+                a.metodo_pago = metodo
+            updated += 1
+    db.session.commit()
+    return jsonify({'updated': updated, 'total': len(alumnos)})
+
+
+PREPATOP_SEED_DATA = [
         # EF LUNES
         ('ANTONIO CARRASCO GUERRERO', 'EF', 'EF LUNES', 'efectivo'),
         ('ADRIÁN VINAGRE CAÑADAS', 'EF', 'EF LUNES', 'efectivo'),
@@ -1092,8 +1111,17 @@ def seed_prepatop():
         ('CRISTINA PARRAL CAÑADA', 'PT', 'PT JÉSSICA 2 AÑOS', 'domiciliacion'),
     ]
 
+
+@app.route('/api/seed-prepatop', methods=['POST'])
+@login_required
+def seed_prepatop():
+    """Seed PREPATOP students from the master Excel data."""
+    existing = Alumno.query.filter_by(academia='PREPATOP').count()
+    if existing > 0:
+        return jsonify({'message': f'Ya hay {existing} alumnos de PREPATOP. No se importaron nuevos.', 'count': existing})
+
     count = 0
-    for nombre, especialidad, grupo, metodo in students:
+    for nombre, especialidad, grupo, metodo in PREPATOP_SEED_DATA:
         alumno = Alumno(
             nombre=nombre.strip(),
             academia='PREPATOP',
