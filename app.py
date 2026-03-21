@@ -368,6 +368,8 @@ def update_lead(lead_id):
 
     if 'fecha_contacto' in data and data['fecha_contacto']:
         lead.fecha_contacto = datetime.fromisoformat(data['fecha_contacto'])
+    if 'fecha_cita' in data and data['fecha_cita']:
+        lead.fecha_cita = datetime.fromisoformat(data['fecha_cita'])
     if 'notas' in data:
         lead.notas = data['notas']
 

@@ -19,6 +19,12 @@
         <button class="academy-tab active" data-academia="" onclick="switchAcademia('')">
             <i class="bi bi-grid-3x3-gap-fill"></i> General
         </button>
+        <button class="academy-tab" style="background:#7C3AED; color:white;" data-academia="GESTION_PREPATOP" onclick="switchAcademia('GESTION_PREPATOP')">
+            <i class="bi bi-cash-stack"></i> PREPATOP 25-26
+        </button>
+        <button class="academy-tab" style="background:#0D6EFD; color:white;" data-academia="SOCIOS" onclick="switchAcademia('SOCIOS')">
+            <i class="bi bi-people-fill"></i> Socios
+        </button>
         <button class="academy-tab tab-prepatop" data-academia="PREPATOP" onclick="switchAcademia('PREPATOP')">
             <i class="bi bi-building"></i> PREPATOP
         </button>
@@ -27,12 +33,6 @@
         </button>
         <button class="academy-tab tab-preparaandalucia" data-academia="PREPARAANDALUCIA" onclick="switchAcademia('PREPARAANDALUCIA')">
             <i class="bi bi-building"></i> PREPARAANDALUCIA
-        </button>
-        <button class="academy-tab" style="background:#7C3AED; color:white;" data-academia="GESTION_PREPATOP" onclick="switchAcademia('GESTION_PREPATOP')">
-            <i class="bi bi-cash-stack"></i> PREPATOP 25-26
-        </button>
-        <button class="academy-tab" style="background:#0D6EFD; color:white;" data-academia="SOCIOS" onclick="switchAcademia('SOCIOS')">
-            <i class="bi bi-people-fill"></i> Socios
         </button>
     </div>
 
@@ -46,8 +46,8 @@
         </div>
         <!-- Academy sub-tabs (hidden by default) -->
         <div class="sub-tab-group" id="subtabs-academia" style="display:none">
-            <button class="sub-tab active" onclick="showView('leads')"><i class="bi bi-people"></i> Leads</button>
-            <button class="sub-tab" onclick="showView('pipeline')"><i class="bi bi-kanban"></i> Pipeline</button>
+            <button class="sub-tab active" onclick="showView('pipeline')"><i class="bi bi-kanban"></i> Pipeline</button>
+            <button class="sub-tab" onclick="showView('leads')"><i class="bi bi-people"></i> Leads</button>
             <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Alumnos</button>
             <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
         </div>
@@ -837,6 +837,30 @@
                     <button type="button" class="btn btn-outline-danger" id="btn-delete-pago" style="display:none" onclick="deletePago()"><i class="bi bi-trash"></i></button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-success" onclick="savePago()"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL HEMOS QUEDADO ═══════════════════ -->
+    <div class="modal fade" id="hemosQuedadoModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-calendar-event"></i> Hemos Quedado</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-2">Fecha y hora de la cita:</p>
+                    <input type="datetime-local" class="form-control" id="hemos-quedado-fecha">
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Nota (opcional)</label>
+                        <input type="text" class="form-control" id="hemos-quedado-nota" placeholder="Ej: Quedamos en la academia">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="confirmHemosQuedado()"><i class="bi bi-check-lg"></i> Confirmar</button>
                 </div>
             </div>
         </div>

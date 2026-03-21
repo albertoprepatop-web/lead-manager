@@ -19,6 +19,7 @@ const ESTADO_LABELS = {
     contactado: 'Contactado',
     no_coge: 'No Coge',
     interesado: 'Interesado',
+    hemos_quedado: 'Hemos Quedado',
     a_espera_de_pago: 'Espera Pago',
     matriculado: 'Matriculado',
     perdido: 'Perdido',
@@ -73,7 +74,7 @@ function switchAcademia(academia) {
     } else {
         document.getElementById('subtabs-general').style.display = 'none';
         document.getElementById('subtabs-academia').style.display = 'flex';
-        showView('leads');
+        showView('pipeline');
     }
 }
 
@@ -342,6 +343,14 @@ async function quickChangeEstado(id, estado) {
         new bootstrap.Modal(document.getElementById('fechaContactoModal')).show();
         return;
     }
+    if (estado === 'hemos_quedado') {
+        pendingContactoLeadId = id;
+        pendingContactoSource = 'quick';
+        document.getElementById('hemos-quedado-fecha').value = '';
+        document.getElementById('hemos-quedado-nota').value = '';
+        new bootstrap.Modal(document.getElementById('hemosQuedadoModal')).show();
+        return;
+    }
     await api(`/api/leads/${id}`, { method: 'PUT', body: { estado } });
 }
 
@@ -602,8 +611,40 @@ async function changeLeadEstado() {
         new bootstrap.Modal(document.getElementById('fechaContactoModal')).show();
         return;
     }
+    if (estado === 'hemos_quedado') {
+        pendingContactoLeadId = currentLeadId;
+        pendingContactoSource = 'detail';
+        document.getElementById('hemos-quedado-fecha').value = '';
+        document.getElementById('hemos-quedado-nota').value = '';
+        new bootstrap.Modal(document.getElementById('hemosQuedadoModal')).show();
+        return;
+    }
     await api(`/api/leads/${currentLeadId}`, { method: 'PUT', body: { estado } });
     openLeadDetail(currentLeadId);
+}
+
+async function confirmHemosQuedado() {
+    const fecha = document.getElementById('hemos-quedado-fecha').value;
+    const nota = document.getElementById('hemos-quedado-nota').value;
+    if (!fecha) { alert('Introduce la fecha y hora de la cita'); return; }
+
+    await api(`/api/leads/${pendingContactoLeadId}`, { method: 'PUT', body: {
+        estado: 'hemos_quedado',
+        fecha_cita: fecha,
+    }});
+
+    // Create seguimiento for the appointment
+    await api('/api/seguimientos', { method: 'POST', body: {
+        lead_id: pendingContactoLeadId,
+        fecha: fecha,
+        nota: nota || 'Cita con el lead',
+    }});
+
+    bootstrap.Modal.getInstance(document.getElementById('hemosQuedadoModal')).hide();
+    if (pendingContactoSource === 'detail') openLeadDetail(pendingContactoLeadId);
+    refreshCurrentView();
+    pendingContactoLeadId = null;
+    pendingContactoSource = null;
 }
 
 async function confirmContacto() {
@@ -1055,6 +1096,7 @@ async function loadEconomica() {
                         type="button" data-bs-toggle="collapse" data-bs-target="#grupo-${gi}">
                     <span class="fw-bold"><i class="bi bi-mortarboard"></i> ${grupo.nombre} <span class="badge bg-dark">${totalAlumnos}</span></span>
                     <span>
+                        <button class="btn btn-sm btn-outline-success me-1 py-0" onclick="event.stopPropagation(); openAddAlumnoEco('${grupo.nombre}')" title="Añadir alumno"><i class="bi bi-person-plus"></i></button>
                         <span class="badge bg-success">${efectivoCount} efect.</span>
                         <span class="badge bg-info">${domiCount} domi.</span>
                         <i class="bi bi-chevron-down"></i>
@@ -1074,7 +1116,8 @@ async function loadEconomica() {
                                 const tipoBadge = a.metodo_pago === 'domiciliacion'
                                     ? '<span class="badge bg-info">Domi</span>'
                                     : '<span class="badge bg-success">Efect.</span>';
-                                return `<tr>
+                                const rowBg = a.metodo_pago === 'domiciliacion' ? 'style="background-color: #e8f0fe;"' : '';
+                                return `<tr ${rowBg}>
                                     <td style="font-size:0.85rem">
                                         <button class="btn btn-sm btn-link p-0 me-1 text-muted" onclick="openEditAlumnoEco(${a.id})" title="Editar"><i class="bi bi-pencil-square"></i></button>
                                         <span class="fw-bold">${a.nombre}</span>
@@ -1112,7 +1155,7 @@ function openPagoModal(alumnoId, mes, cuota, pagoId = null) {
     document.getElementById('pago-id').value = pagoId || '';
     document.getElementById('pago-mes-label').textContent = formatMes(mes);
     document.getElementById('pago-metodo').value = 'efectivo';
-    document.getElementById('pago-cantidad').value = cuota || '';
+    document.getElementById('pago-cantidad').value = cuota || 180;
     document.getElementById('pago-recogido').value = 'Alberto';
     document.getElementById('btn-delete-pago').style.display = pagoId ? 'inline-block' : 'none';
 
@@ -1220,7 +1263,15 @@ async function saveAlumnoEco() {
 
     if (!nombre) { alert('El nombre es obligatorio'); return; }
 
-    await api(`/api/alumnos/${id}`, { method: 'PUT', body: { nombre, metodo_pago, grupo } });
+    if (id) {
+        await api(`/api/alumnos/${id}`, { method: 'PUT', body: { nombre, metodo_pago, grupo } });
+    } else {
+        // Create new alumno
+        const apiAcademia = currentAcademia === 'GESTION_PREPATOP' ? 'PREPATOP' : currentAcademia;
+        await api('/api/alumnos', { method: 'POST', body: {
+            nombre, metodo_pago, grupo, academia: apiAcademia, especialidad: grupo.split(' ')[0], curso: 'Oposiciones'
+        }});
+    }
     bootstrap.Modal.getInstance(document.getElementById('editAlumnoEcoModal')).hide();
     loadEconomica();
 }
@@ -1233,6 +1284,15 @@ async function deleteAlumnoEco() {
     await api(`/api/alumnos/${id}`, { method: 'DELETE' });
     bootstrap.Modal.getInstance(document.getElementById('editAlumnoEcoModal')).hide();
     loadEconomica();
+}
+
+function openAddAlumnoEco(grupo) {
+    document.getElementById('edit-eco-alumno-id').value = '';
+    document.getElementById('edit-eco-nombre').value = '';
+    document.getElementById('edit-eco-metodo').value = 'efectivo';
+    document.getElementById('edit-eco-grupo').value = grupo;
+    document.querySelector('#editAlumnoEcoModal .modal-title').innerHTML = '<i class="bi bi-person-plus"></i> Añadir Alumno';
+    new bootstrap.Modal(document.getElementById('editAlumnoEcoModal')).show();
 }
 
 function openAddMesModal() {
