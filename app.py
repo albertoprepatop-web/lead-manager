@@ -44,6 +44,10 @@ with app.app_context():
             db.session.execute(text("ALTER TABLE alumnos ADD COLUMN grupo VARCHAR(100) DEFAULT ''"))
         if 'metodo_pago' not in columns:
             db.session.execute(text("ALTER TABLE alumnos ADD COLUMN metodo_pago VARCHAR(20) DEFAULT 'efectivo'"))
+        # Leads columns
+        lead_columns = [c['name'] for c in inspector.get_columns('leads')]
+        if 'fecha_cita' not in lead_columns:
+            db.session.execute(text('ALTER TABLE leads ADD COLUMN fecha_cita TIMESTAMP'))
         db.session.commit()
     except Exception:
         db.session.rollback()
