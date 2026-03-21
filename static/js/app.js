@@ -127,6 +127,13 @@ async function loadDashboard() {
     document.getElementById('kpi-alumnos').textContent = data.total_alumnos;
     document.getElementById('kpi-seguimientos').textContent = data.seguimientos_pendientes;
 
+    // PREPATOP 25/26
+    if (data.prepatop_2526) {
+        document.getElementById('kpi-alumnos-2526').textContent = data.prepatop_2526.alumnos;
+        document.getElementById('kpi-efectivo-2526').textContent = data.prepatop_2526.efectivo.toFixed(2) + ' €';
+        document.getElementById('kpi-recibo-2526').textContent = data.prepatop_2526.recibo.toFixed(2) + ' €';
+    }
+
     for (const [academia, info] of Object.entries(data.por_academia)) {
         const key = academia.toLowerCase();
         document.getElementById(`ac-${key}-total`).textContent = info.total;

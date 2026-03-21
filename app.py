@@ -171,6 +171,26 @@ def dashboard():
             count = Alumno.query.filter_by(academia=academia_name, especialidad=esp).count()
             por_especialidad[academia_name][esp] = count
 
+    # PREPATOP 25/26 stats
+    alumnos_2526 = Alumno.query.filter(
+        Alumno.academia == 'PREPATOP',
+        Alumno.grupo != '',
+        Alumno.grupo.isnot(None)
+    )
+    total_alumnos_2526 = alumnos_2526.count()
+    pagos_efectivo_2526 = db.session.query(db.func.sum(Pago.cantidad)).join(Alumno).filter(
+        Alumno.academia == 'PREPATOP',
+        Alumno.grupo != '',
+        Alumno.grupo.isnot(None),
+        Pago.metodo == 'efectivo',
+    ).scalar() or 0
+    pagos_recibo_2526 = db.session.query(db.func.sum(Pago.cantidad)).join(Alumno).filter(
+        Alumno.academia == 'PREPATOP',
+        Alumno.grupo != '',
+        Alumno.grupo.isnot(None),
+        Pago.metodo == 'recibo',
+    ).scalar() or 0
+
     return jsonify({
         'total_leads': total,
         'nuevos_semana': nuevos_semana,
@@ -181,6 +201,11 @@ def dashboard():
         'alumnos_por_mes': alumnos_por_mes,
         'por_especialidad': por_especialidad,
         'seguimientos_proximos': [s.to_dict() for s in seguimientos_proximos],
+        'prepatop_2526': {
+            'alumnos': total_alumnos_2526,
+            'efectivo': pagos_efectivo_2526,
+            'recibo': pagos_recibo_2526,
+        },
     })
 
 
