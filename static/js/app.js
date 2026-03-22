@@ -1335,6 +1335,55 @@ function openAddAlumnoEco(grupo) {
     new bootstrap.Modal(document.getElementById('editAlumnoEcoModal')).show();
 }
 
+// ── SEPA Upload ──────────────────────────────────────────────────────────
+function openSepaModal() {
+    const academia = currentAcademia || 'PREPARAANDALUCIA';
+    const esps = ESPECIALIDADES[academia] || [];
+    const select = document.getElementById('sepa-especialidad');
+    select.innerHTML = esps.map(e => `<option value="${e}">${e}</option>`).join('');
+    document.getElementById('sepa-file').value = '';
+    document.getElementById('sepa-preview').style.display = 'none';
+    document.getElementById('sepa-error').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('sepaModal')).show();
+}
+
+async function uploadSepa() {
+    const fileInput = document.getElementById('sepa-file');
+    if (!fileInput.files.length) { alert('Selecciona un archivo PDF'); return; }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('academia', currentAcademia || 'PREPARAANDALUCIA');
+    formData.append('especialidad', document.getElementById('sepa-especialidad').value);
+
+    try {
+        const resp = await fetch('/api/upload-sepa', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await resp.json();
+
+        if (resp.ok) {
+            document.getElementById('sepa-preview').style.display = 'block';
+            document.getElementById('sepa-preview').innerHTML = `
+                <strong>Alumno matriculado:</strong> ${data.alumno.nombre}<br>
+                <small>Tel: ${data.extracted.telefono || '-'} | Email: ${data.extracted.email || '-'} | IBAN: ${data.extracted.iban || '-'}</small>
+            `;
+            document.getElementById('sepa-error').style.display = 'none';
+            refreshCurrentView();
+        } else {
+            document.getElementById('sepa-error').style.display = 'block';
+            document.getElementById('sepa-error').textContent = data.error || 'Error al procesar';
+            if (data.all_field_names) {
+                document.getElementById('sepa-error').innerHTML += '<br><small>Campos: ' + data.all_field_names.join(', ') + '</small>';
+            }
+            document.getElementById('sepa-preview').style.display = 'none';
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
 function openAddMesModal() {
     // Default to next month
     const now = new Date();

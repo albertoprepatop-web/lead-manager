@@ -989,6 +989,69 @@ def bulk_set_domiciliacion():
     return jsonify({'updated': updated, 'not_found': not_found})
 
 
+@app.route('/api/upload-sepa', methods=['POST'])
+@login_required
+def upload_sepa():
+    """Extract student data from a filled SEPA PDF form and create alumno."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    academia = request.form.get('academia', 'PREPARAANDALUCIA')
+    especialidad = request.form.get('especialidad', '')
+
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(file)
+        fields = reader.get_form_text_fields() or {}
+
+        # Try to extract data from form fields
+        nombre = fields.get('Nombre', '').strip()
+        apellidos = fields.get('Apellidos', '').strip()
+        nif = fields.get('NIFNIE', '') or fields.get('NIF/NIE', '') or ''
+        telefono = fields.get('Teléfono', '') or fields.get('Telefono', '') or ''
+        email = fields.get('Correo electrónico', '') or fields.get('Correo electronico', '') or ''
+        iban = fields.get('IBAN', '').strip()
+        direccion = fields.get('Dirección', '') or fields.get('Direccion', '') or ''
+        cp_ciudad = fields.get('Código postal y ciudad', '') or fields.get('Codigo postal y ciudad', '') or ''
+
+        # If fields are empty, try all fields and return them for debugging
+        if not nombre and not apellidos:
+            return jsonify({
+                'error': 'No se pudieron extraer los datos del PDF. Campos encontrados:',
+                'fields': {k: v for k, v in fields.items() if v},
+                'all_field_names': list(fields.keys()),
+            }), 400
+
+        full_name = f"{nombre} {apellidos}".strip()
+
+        # Create alumno
+        alumno = Alumno(
+            nombre=full_name,
+            telefono=telefono.strip(),
+            email=email.strip(),
+            academia=academia,
+            especialidad=especialidad,
+            metodo_pago='domiciliacion',
+            curso='Oposiciones',
+            notas=f"NIF: {nif.strip()} | IBAN: {iban} | Dir: {direccion} {cp_ciudad}".strip(),
+        )
+        db.session.add(alumno)
+        db.session.commit()
+
+        return jsonify({
+            'message': f'Alumno {full_name} matriculado correctamente',
+            'alumno': alumno.to_dict(),
+            'extracted': {
+                'nombre': nombre, 'apellidos': apellidos, 'nif': nif,
+                'telefono': telefono, 'email': email, 'iban': iban,
+            },
+        }), 201
+
+    except Exception as e:
+        return jsonify({'error': f'Error procesando el PDF: {str(e)}'}), 400
+
+
 @app.route('/api/reset-prepatop-2526', methods=['POST'])
 @login_required
 def reset_prepatop_2526():

@@ -48,6 +48,7 @@
         <div class="sub-tab-group" id="subtabs-academia" style="display:none">
             <button class="sub-tab active" onclick="showView('pipeline')"><i class="bi bi-kanban"></i> Pipeline</button>
             <button class="sub-tab" onclick="showView('leads')"><i class="bi bi-people"></i> Leads</button>
+            <button class="sub-tab btn-outline-primary" onclick="openSepaModal()" title="Matricular con SEPA"><i class="bi bi-file-earmark-pdf"></i> Subir SEPA</button>
             <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Alumnos</button>
             <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
         </div>
@@ -910,6 +911,36 @@
                     <button type="button" class="btn btn-outline-danger me-auto" onclick="deleteAlumnoEco()"><i class="bi bi-trash"></i></button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="saveAlumnoEco()"><i class="bi bi-check-lg"></i> Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL SUBIR SEPA ═══════════════════ -->
+    <div class="modal fade" id="sepaModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-pdf"></i> Matricular con SEPA</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Especialidad</label>
+                        <select class="form-select" id="sepa-especialidad"></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Archivo SEPA (PDF rellenado) *</label>
+                        <input type="file" class="form-control" id="sepa-file" accept=".pdf">
+                    </div>
+                    <div id="sepa-preview" style="display:none" class="alert alert-info">
+                        <small>Datos extraídos del PDF aparecerán aquí</small>
+                    </div>
+                    <div id="sepa-error" style="display:none" class="alert alert-danger"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="uploadSepa()"><i class="bi bi-upload"></i> Matricular</button>
                 </div>
             </div>
         </div>
