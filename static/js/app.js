@@ -1156,7 +1156,7 @@ async function loadEconomica() {
                                 const tipoBadge = a.metodo_pago === 'domiciliacion'
                                     ? '<span class="badge bg-info">Domi</span>'
                                     : '<span class="badge bg-success">Efect.</span>';
-                                const rowBg = a.metodo_pago === 'domiciliacion' ? 'style="background-color: #e8f0fe;"' : '';
+                                const rowBg = a.metodo_pago === 'domiciliacion' ? 'class="table-info"' : '';
                                 return `<tr ${rowBg}>
                                     <td style="font-size:0.85rem">
                                         <button class="btn btn-sm btn-link p-0 me-1 text-muted" onclick="openEditAlumnoEco(${a.id})" title="Editar"><i class="bi bi-pencil-square"></i></button>
