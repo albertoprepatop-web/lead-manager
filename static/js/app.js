@@ -150,7 +150,7 @@ async function loadDashboard() {
     }
 
     renderChartEstados(data.por_academia);
-    renderChartMeses(data.por_mes);
+    renderChartMeses(data.por_semana);
     if (data.alumnos_por_mes) renderChartAlumnosMes(data.alumnos_por_mes);
     if (data.por_especialidad) renderChartsEspecialidad(data.por_especialidad);
 
@@ -212,14 +212,15 @@ function renderChartEstados(porAcademia) {
     });
 }
 
-function renderChartMeses(porMes) {
+function renderChartMeses(porSemana) {
+    if (!porSemana || porSemana.length === 0) return;
     const ctx = document.getElementById('chart-meses').getContext('2d');
     if (chartMeses) chartMeses.destroy();
     chartMeses = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
-            labels: porMes.map(m => m.mes),
-            datasets: [{ label: 'Nuevos Leads', data: porMes.map(m => m.count), borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.1)', fill: true, tension: 0.3 }],
+            labels: porSemana.map(s => s.semana),
+            datasets: [{ label: 'Leads por Semana', data: porSemana.map(s => s.count), backgroundColor: '#2563EB', borderColor: '#1D4ED8', borderWidth: 1 }],
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
     });

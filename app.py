@@ -128,29 +128,31 @@ def dashboard():
             'alumnos': alumnos_ac,
         }
 
-    # Leads por mes (ultimos 6 meses)
-    por_mes = []
-    for i in range(5, -1, -1):
-        mes_inicio = (now.replace(day=1) - timedelta(days=30 * i)).replace(day=1)
-        if i > 0:
-            mes_fin = (now.replace(day=1) - timedelta(days=30 * (i - 1))).replace(day=1)
-        else:
-            mes_fin = now + timedelta(days=1)
+    # Leads por semana (desde 1 marzo 2026)
+    por_semana = []
+    inicio_marzo = datetime(2026, 3, 1)
+    # Find the Monday of the week containing March 1
+    start_week = inicio_marzo - timedelta(days=inicio_marzo.weekday())
+    current_week = start_week
+    while current_week <= now:
+        week_end = current_week + timedelta(days=7)
         count = Lead.query.filter(
-            Lead.created_at >= mes_inicio,
-            Lead.created_at < mes_fin
+            Lead.created_at >= current_week,
+            Lead.created_at < week_end
         ).count()
-        por_mes.append({
-            'mes': mes_inicio.strftime('%b %Y'),
+        label = f"{current_week.strftime('%d/%m')} - {(week_end - timedelta(days=1)).strftime('%d/%m')}"
+        por_semana.append({
+            'semana': label,
             'count': count,
         })
+        current_week = week_end
 
     # Seguimientos proximos
     seguimientos_proximos = Seguimiento.query.filter(
         Seguimiento.completado == False
     ).order_by(Seguimiento.fecha.asc()).limit(10).all()
 
-    # Alumnos por mes (ultimos 6 meses)
+    # Alumnos por mes (ultimos 6 meses) - only 26/27 students (exclude PREPATOP 25/26)
     alumnos_por_mes = []
     for i in range(5, -1, -1):
         mes_inicio = (now.replace(day=1) - timedelta(days=30 * i)).replace(day=1)
@@ -160,7 +162,8 @@ def dashboard():
             mes_fin = now + timedelta(days=1)
         count = Alumno.query.filter(
             Alumno.fecha_matricula >= mes_inicio,
-            Alumno.fecha_matricula < mes_fin
+            Alumno.fecha_matricula < mes_fin,
+            db.or_(Alumno.grupo == '', Alumno.grupo.is_(None))
         ).count()
         alumnos_por_mes.append({
             'mes': mes_inicio.strftime('%b %Y'),
@@ -207,7 +210,7 @@ def dashboard():
         'total_alumnos': total_alumnos,
         'seguimientos_pendientes': seguimientos_pendientes,
         'por_academia': por_academia,
-        'por_mes': por_mes,
+        'por_semana': por_semana,
         'alumnos_por_mes': alumnos_por_mes,
         'por_especialidad': por_especialidad,
         'seguimientos_proximos': [s.to_dict() for s in seguimientos_proximos],
