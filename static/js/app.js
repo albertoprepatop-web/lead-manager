@@ -1011,6 +1011,7 @@ async function loadPipeline() {
                 <div class="lead-name">${l.nombre}</div>
                 <div class="lead-meta">
                     <span class="badge badge-${l.academia.toLowerCase()}" style="font-size:0.65rem">${l.academia}</span>
+                    ${l.especialidad ? `<span class="badge bg-secondary" style="font-size:0.6rem">${l.especialidad}</span>` : ''}
                 </div>
                 ${l.telefono ? `<div class="lead-meta mt-1"><i class="bi bi-telephone"></i> ${l.telefono}</div>` : ''}
                 ${l.llamadas > 0 ? `<div class="lead-meta mt-1"><i class="bi bi-telephone-outbound text-primary"></i> <small>${l.llamadas} llamada${l.llamadas > 1 ? 's' : ''}</small></div>` : ''}
