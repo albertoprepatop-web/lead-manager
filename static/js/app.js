@@ -992,6 +992,15 @@ async function deleteSeguimiento(id) {
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────
+function filterPipeline() {
+    const q = (document.getElementById('pipeline-search')?.value || '').toLowerCase().trim();
+    document.querySelectorAll('.pipeline-card').forEach(card => {
+        if (!q) { card.style.display = ''; return; }
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+
 async function loadPipeline() {
     const params = currentAcademia ? `?academia=${currentAcademia}` : '';
     document.getElementById('pipeline-title').innerHTML = currentAcademia
