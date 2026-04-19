@@ -19,6 +19,7 @@ const ESTADO_LABELS = {
     contactado: 'WhatsApp sin respuesta',
     no_coge: 'No Coge',
     interesado: 'Interesado',
+    poco_interesada: 'Poco Interesada',
     hemos_quedado: 'Hemos Quedado',
     a_espera_de_pago: 'Espera Pago',
     matriculado: 'Matriculado',
@@ -1008,7 +1009,7 @@ async function loadPipeline() {
         : `<i class="bi bi-kanban"></i> Pipeline de Ventas`;
 
     const leads = await api(`/api/leads${params}`);
-    const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'hemos_quedado', 'a_espera_de_pago', 'matriculado', 'perdido'];
+    const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'poco_interesada', 'hemos_quedado', 'a_espera_de_pago', 'matriculado', 'perdido'];
 
     for (const estado of estados) {
         const container = document.getElementById(`pipeline-${estado}`);
