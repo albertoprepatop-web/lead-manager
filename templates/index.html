@@ -331,6 +331,39 @@
                          ondragover="event.preventDefault()" ondrop="dropLead(event, 'perdido')"></div>
                 </div>
             </div>
+
+            <!-- Carpetita Sin Preparador -->
+            <div id="folder-sin-preparador"
+                 ondragover="event.preventDefault(); this.classList.add('drag-over');"
+                 ondragleave="this.classList.remove('drag-over');"
+                 ondrop="this.classList.remove('drag-over'); dropLead(event, 'sin_preparador')"
+                 onclick="openSinPreparadorModal()"
+                 title="Sin preparador (arrastra aqu\u00ed o click para ver)"
+                 style="position:fixed; bottom:20px; right:20px; width:90px; height:90px; background:#6B7280; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.3); color:white; z-index:1000; transition:all 0.2s;">
+                <i class="bi bi-folder-fill" style="font-size:1.8rem;"></i>
+                <small style="font-size:0.65rem; text-align:center; line-height:1; margin-top:4px;">Sin<br>preparador</small>
+                <span id="folder-sin-preparador-count" class="badge bg-light text-dark" style="position:absolute; top:-8px; right:-8px; font-size:0.7rem;">0</span>
+            </div>
+            <style>
+                #folder-sin-preparador.drag-over { background:#1F2937 !important; transform:scale(1.1); }
+                #folder-sin-preparador:hover { background:#4B5563; }
+            </style>
+
+            <!-- Modal Sin Preparador -->
+            <div class="modal fade" id="sinPreparadorModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-secondary text-white">
+                            <h5 class="modal-title"><i class="bi bi-folder-fill"></i> Leads sin preparador</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted small mb-3">Estos leads no se pueden ofertar porque no tenemos preparador de su especialidad.</p>
+                            <div id="sin-preparador-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- ═══════════════════ ALUMNOS ═══════════════════ -->

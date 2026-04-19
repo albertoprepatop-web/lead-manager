@@ -20,6 +20,7 @@ const ESTADO_LABELS = {
     no_coge: 'No Coge',
     interesado: 'Interesado',
     poco_interesada: 'Poco Interesada',
+    sin_preparador: 'Sin Preparador',
     hemos_quedado: 'Hemos Quedado',
     a_espera_de_pago: 'Espera Pago',
     matriculado: 'Matriculado',
@@ -993,6 +994,30 @@ async function deleteSeguimiento(id) {
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────
+function openSinPreparadorModal() {
+    const leads = (window._allLeads || []).filter(l => l.estado === 'sin_preparador');
+    const list = document.getElementById('sin-preparador-list');
+    if (leads.length === 0) {
+        list.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox" style="font-size:2rem"></i><p class="mt-2 mb-0">Carpeta vacía</p></div>';
+    } else {
+        list.innerHTML = '<div class="list-group">' + leads.map(l => `
+            <a href="#" class="list-group-item list-group-item-action" onclick="bootstrap.Modal.getInstance(document.getElementById('sinPreparadorModal')).hide(); openLeadDetail(${l.id}); return false;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${l.nombre}</strong>
+                        ${l.telefono ? `<br><small class="text-muted"><i class="bi bi-telephone"></i> ${l.telefono}</small>` : ''}
+                    </div>
+                    <div>
+                        <span class="badge badge-${l.academia.toLowerCase()}">${l.academia}</span>
+                        ${l.especialidad ? `<span class="badge bg-secondary">${l.especialidad}</span>` : ''}
+                    </div>
+                </div>
+            </a>
+        `).join('') + '</div>';
+    }
+    new bootstrap.Modal(document.getElementById('sinPreparadorModal')).show();
+}
+
 function filterPipeline() {
     const q = (document.getElementById('pipeline-search')?.value || '').toLowerCase().trim();
     document.querySelectorAll('.pipeline-card').forEach(card => {
@@ -1009,10 +1034,17 @@ async function loadPipeline() {
         : `<i class="bi bi-kanban"></i> Pipeline de Ventas`;
 
     const leads = await api(`/api/leads${params}`);
+    window._allLeads = leads;
     const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'poco_interesada', 'hemos_quedado', 'a_espera_de_pago', 'matriculado', 'perdido'];
+
+    // Update folder count for sin_preparador
+    const sinPrepCount = leads.filter(l => l.estado === 'sin_preparador').length;
+    const folderBadge = document.getElementById('folder-sin-preparador-count');
+    if (folderBadge) folderBadge.textContent = sinPrepCount;
 
     for (const estado of estados) {
         const container = document.getElementById(`pipeline-${estado}`);
+        if (!container) continue;
         const estadoLeads = leads.filter(l => l.estado === estado);
         container.innerHTML = estadoLeads.map(l => `
             <div class="pipeline-card" draggable="true" data-id="${l.id}"
