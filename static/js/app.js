@@ -994,14 +994,35 @@ async function deleteSeguimiento(id) {
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────
-function openSinPreparadorModal() {
-    const leads = (window._allLeads || []).filter(l => l.estado === 'sin_preparador');
-    const list = document.getElementById('sin-preparador-list');
+const CARPETA_CONFIG = {
+    sin_preparador: {
+        title: '<i class="bi bi-folder-fill"></i> Leads sin preparador',
+        desc: 'Estos leads no se pueden ofertar porque no tenemos preparador de su especialidad.',
+        headerClass: 'bg-secondary text-white',
+    },
+    perdido: {
+        title: '<i class="bi bi-trash-fill"></i> Leads perdidos',
+        desc: 'Leads marcados como perdidos. Puedes arrastrarlos de nuevo al pipeline si cambia la situación.',
+        headerClass: 'bg-danger text-white',
+    },
+};
+
+function openCarpetaModal(estado) {
+    const cfg = CARPETA_CONFIG[estado];
+    if (!cfg) return;
+    const leads = (window._allLeads || []).filter(l => l.estado === estado);
+
+    const header = document.getElementById('carpeta-header');
+    header.className = 'modal-header ' + cfg.headerClass;
+    document.getElementById('carpeta-title').innerHTML = cfg.title;
+    document.getElementById('carpeta-desc').textContent = cfg.desc;
+
+    const list = document.getElementById('carpeta-list');
     if (leads.length === 0) {
         list.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox" style="font-size:2rem"></i><p class="mt-2 mb-0">Carpeta vacía</p></div>';
     } else {
         list.innerHTML = '<div class="list-group">' + leads.map(l => `
-            <a href="#" class="list-group-item list-group-item-action" onclick="bootstrap.Modal.getInstance(document.getElementById('sinPreparadorModal')).hide(); openLeadDetail(${l.id}); return false;">
+            <a href="#" class="list-group-item list-group-item-action" onclick="bootstrap.Modal.getInstance(document.getElementById('carpetaModal')).hide(); openLeadDetail(${l.id}); return false;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <strong>${l.nombre}</strong>
@@ -1015,8 +1036,11 @@ function openSinPreparadorModal() {
             </a>
         `).join('') + '</div>';
     }
-    new bootstrap.Modal(document.getElementById('sinPreparadorModal')).show();
+    new bootstrap.Modal(document.getElementById('carpetaModal')).show();
 }
+
+// Backwards compat
+function openSinPreparadorModal() { openCarpetaModal('sin_preparador'); }
 
 function filterPipeline() {
     const q = (document.getElementById('pipeline-search')?.value || '').toLowerCase().trim();
@@ -1035,12 +1059,16 @@ async function loadPipeline() {
 
     const leads = await api(`/api/leads${params}`);
     window._allLeads = leads;
-    const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'poco_interesada', 'hemos_quedado', 'a_espera_de_pago', 'matriculado', 'perdido'];
+    const estados = ['nuevo', 'contactado', 'no_coge', 'interesado', 'poco_interesada', 'hemos_quedado', 'a_espera_de_pago', 'matriculado'];
 
-    // Update folder count for sin_preparador
+    // Update folder counts (sin_preparador and perdido are folders, not columns)
     const sinPrepCount = leads.filter(l => l.estado === 'sin_preparador').length;
-    const folderBadge = document.getElementById('folder-sin-preparador-count');
-    if (folderBadge) folderBadge.textContent = sinPrepCount;
+    const sinPrepBadge = document.getElementById('folder-sin-preparador-count');
+    if (sinPrepBadge) sinPrepBadge.textContent = sinPrepCount;
+
+    const perdidoCount = leads.filter(l => l.estado === 'perdido').length;
+    const perdidoBadge = document.getElementById('folder-perdido-count');
+    if (perdidoBadge) perdidoBadge.textContent = perdidoCount;
 
     for (const estado of estados) {
         const container = document.getElementById(`pipeline-${estado}`);
