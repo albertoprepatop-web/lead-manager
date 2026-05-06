@@ -1066,40 +1066,66 @@ async function loadPipeline() {
         header.textContent = `${originalText} (${estadoLeads.length})`;
     }
 
-    document.querySelectorAll('.pipeline-body').forEach(body => {
-        body.addEventListener('dragover', (e) => { e.preventDefault(); body.classList.add('drag-over'); });
-        body.addEventListener('dragleave', () => { body.classList.remove('drag-over'); });
-        body.addEventListener('drop', () => { body.classList.remove('drag-over'); });
-    });
+    // Visual drag-over effect (only registered once to avoid listener accumulation)
+    if (!window._pipelineDragHandlersRegistered) {
+        window._pipelineDragHandlersRegistered = true;
+        document.addEventListener('dragover', (e) => {
+            const body = e.target.closest('.pipeline-body');
+            if (body) {
+                e.preventDefault();
+                document.querySelectorAll('.pipeline-body.drag-over').forEach(b => { if (b !== body) b.classList.remove('drag-over'); });
+                body.classList.add('drag-over');
+            }
+        });
+        document.addEventListener('drop', (e) => {
+            document.querySelectorAll('.pipeline-body.drag-over').forEach(b => b.classList.remove('drag-over'));
+        });
+        document.addEventListener('dragend', (e) => {
+            document.querySelectorAll('.pipeline-body.drag-over').forEach(b => b.classList.remove('drag-over'));
+            document.querySelectorAll('.pipeline-card.dragging').forEach(c => c.classList.remove('dragging'));
+        });
+    }
 }
 
 let draggedLeadId = null;
 
 function dragStart(event, id) {
     draggedLeadId = id;
-    event.target.classList.add('dragging');
+    // Find the card element (event.target may be a child)
+    const card = event.target.closest('.pipeline-card');
+    if (card) card.classList.add('dragging');
+    // setData is REQUIRED by some browsers (Firefox) for drag to initiate
+    try { event.dataTransfer.setData('text/plain', String(id)); } catch (e) {}
     event.dataTransfer.effectAllowed = 'move';
 }
 
-function dragEnd(event) { event.target.classList.remove('dragging'); }
+function dragEnd(event) {
+    document.querySelectorAll('.pipeline-card.dragging').forEach(c => c.classList.remove('dragging'));
+}
 
 async function dropLead(event, estado) {
     event.preventDefault();
-    if (draggedLeadId) {
-        if (estado === 'hemos_quedado') {
-            quickChangeEstado(draggedLeadId, 'hemos_quedado');
-            draggedLeadId = null;
-            return;
-        }
-        if (estado === 'contactado') {
-            quickChangeEstado(draggedLeadId, 'contactado');
-            draggedLeadId = null;
-            return;
-        }
-        await api(`/api/leads/${draggedLeadId}`, { method: 'PUT', body: { estado } });
-        draggedLeadId = null;
-        loadPipeline();
+    event.stopPropagation();
+    // Recover ID from dataTransfer in case state was lost
+    let id = draggedLeadId;
+    if (!id) {
+        try { id = parseInt(event.dataTransfer.getData('text/plain'), 10) || null; } catch (e) {}
     }
+    if (!id) return;
+
+    if (estado === 'hemos_quedado') {
+        quickChangeEstado(id, 'hemos_quedado');
+        draggedLeadId = null;
+        return;
+    }
+    if (estado === 'contactado') {
+        quickChangeEstado(id, 'contactado');
+        draggedLeadId = null;
+        return;
+    }
+    await api(`/api/leads/${id}`, { method: 'PUT', body: { estado } });
+    draggedLeadId = null;
+    loadPipeline();
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────
