@@ -640,24 +640,28 @@ const WA_ACADEMIA_NOMBRES = {
 
 const WA_TEMPLATES = [
     {
-        titulo: 'Primer contacto',
-        texto: 'Hola {nombre}, soy Alberto de {academia}. He visto tu interés en preparar oposiciones con nosotros. ¿Cuándo te viene bien que hablemos para resolver dudas? Un saludo.'
+        titulo: 'Te he llamado y no lo has cogido',
+        texto: 'Hola {nombre}, te he llamado pero no he podido localizarte. Soy de {academia}. Cuando puedas, dime un buen momento para devolverte la llamada. Un saludo.'
     },
     {
-        titulo: 'No coge el teléfono',
-        texto: 'Hola {nombre}, te he intentado llamar pero no hemos podido hablar. Soy de {academia}. Cuando puedas, dime un buen momento para llamarte y resolver tus dudas. Gracias.'
+        titulo: 'Info tras hablar',
+        texto: 'Hola {nombre}, encantado de hablar contigo. Como te comenté, te paso por aquí toda la información de {academia}. Cualquier duda me dices. Un saludo.'
     },
     {
-        titulo: 'Confirmar cita',
-        texto: 'Hola {nombre}, te confirmo nuestra cita en {academia}. ¿Necesitas la dirección o tienes alguna duda antes de vernos? Un saludo.'
+        titulo: 'Recordatorio de cita',
+        texto: 'Hola {nombre}, te recuerdo nuestra cita en {academia}. ¿Necesitas la dirección o tienes alguna duda antes de vernos? Un saludo.'
     },
     {
-        titulo: 'Información matrícula y cuota',
-        texto: 'Hola {nombre}, te paso la información sobre matrícula y cuotas de {academia} como hablamos. Cualquier duda me dices. Un saludo.'
+        titulo: 'Después de la reunión',
+        texto: 'Hola {nombre}, ha sido un placer conocerte. ¿Tienes ya alguna duda sobre la preparación en {academia} o necesitas que te pase más información? Quedo atento. Un saludo.'
     },
     {
-        titulo: 'Reactivar lead',
-        texto: 'Hola {nombre}, hace tiempo que no hablamos. Te escribo desde {academia} para saber si sigues interesado/a en la preparación. Quedo a la espera. Un saludo.'
+        titulo: 'Esperando confirmación',
+        texto: 'Hola {nombre}, ¿qué tal? Te escribo para saber si has podido pensar lo de la preparación con {academia}. Quedo a la espera de lo que me digas. Un saludo.'
+    },
+    {
+        titulo: 'Recordatorio matrícula/pago',
+        texto: 'Hola {nombre}, te recuerdo que falta formalizar la matrícula en {academia} para reservar tu plaza. Cualquier cosa que necesites para el pago me dices. Un saludo.'
     },
 ];
 
