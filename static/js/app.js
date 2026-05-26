@@ -641,7 +641,7 @@ const WA_ACADEMIA_NOMBRES = {
 const WA_TEMPLATES = [
     {
         titulo: 'Te he llamado y no lo has cogido',
-        texto: 'Hola {nombre}, te he llamado pero no he podido localizarte. Soy de {academia}. Cuando puedas, dime un buen momento para devolverte la llamada. Un saludo.'
+        texto: '¡Hola {nombre}! Soy Alberto de {academia}. Te he intentado llamar para comentarte la información sobre la preparación de oposiciones, pero no he podido contactar contigo. ¿Cuándo te viene mejor que te llame? Estoy disponible por la mañana, tarde o noche. ¡Un saludo!'
     },
     {
         titulo: 'Info tras hablar',
