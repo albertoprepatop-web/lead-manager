@@ -574,6 +574,7 @@ function confirmDeleteLead(id) {
 async function openLeadDetail(id) {
     currentLeadId = id;
     const lead = await api(`/api/leads/${id}`);
+    window._currentLeadData = lead;
 
     document.getElementById('detail-nombre').textContent = lead.nombre;
     document.getElementById('detail-tel').href = `tel:${lead.telefono}`;
@@ -628,6 +629,89 @@ async function openLeadDetail(id) {
     }
 
     new bootstrap.Offcanvas(document.getElementById('leadDetail')).show();
+}
+
+// ── WhatsApp ──────────────────────────────────────────────────────────────
+const WA_ACADEMIA_NOMBRES = {
+    PREPATOP: 'PrepaTop',
+    PREPARAANDALUCIA: 'Prepara Andalucía',
+    PREPARASECUNDARIA: 'Prepara Secundaria',
+};
+
+const WA_TEMPLATES = [
+    {
+        titulo: 'Primer contacto',
+        texto: 'Hola {nombre}, soy Alberto de {academia}. He visto tu interés en preparar oposiciones con nosotros. ¿Cuándo te viene bien que hablemos para resolver dudas? Un saludo.'
+    },
+    {
+        titulo: 'No coge el teléfono',
+        texto: 'Hola {nombre}, te he intentado llamar pero no hemos podido hablar. Soy de {academia}. Cuando puedas, dime un buen momento para llamarte y resolver tus dudas. Gracias.'
+    },
+    {
+        titulo: 'Confirmar cita',
+        texto: 'Hola {nombre}, te confirmo nuestra cita en {academia}. ¿Necesitas la dirección o tienes alguna duda antes de vernos? Un saludo.'
+    },
+    {
+        titulo: 'Información matrícula y cuota',
+        texto: 'Hola {nombre}, te paso la información sobre matrícula y cuotas de {academia} como hablamos. Cualquier duda me dices. Un saludo.'
+    },
+    {
+        titulo: 'Reactivar lead',
+        texto: 'Hola {nombre}, hace tiempo que no hablamos. Te escribo desde {academia} para saber si sigues interesado/a en la preparación. Quedo a la espera. Un saludo.'
+    },
+];
+
+function waNormalizePhone(tel) {
+    if (!tel) return '';
+    let digits = String(tel).replace(/\D/g, '');
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.length === 9 && /^[679]/.test(digits)) digits = '34' + digits;
+    return digits;
+}
+
+function waFillTemplate(text, lead) {
+    const nombre = (lead.nombre || '').trim().split(/\s+/)[0] || '';
+    const academia = WA_ACADEMIA_NOMBRES[lead.academia] || lead.academia || '';
+    return text.replace(/\{nombre\}/g, nombre).replace(/\{academia\}/g, academia);
+}
+
+function openWhatsApp() {
+    const lead = window._currentLeadData;
+    if (!lead) return;
+    if (!lead.telefono) {
+        alert('Este lead no tiene teléfono.');
+        return;
+    }
+    document.getElementById('wa-nombre').textContent = lead.nombre;
+    document.getElementById('wa-telefono').textContent = lead.telefono;
+
+    const list = document.getElementById('wa-templates');
+    list.innerHTML = WA_TEMPLATES.map((t, i) => `
+        <a href="#" class="list-group-item list-group-item-action" onclick="selectWhatsAppTemplate(${i}); return false;">
+            <strong>${t.titulo}</strong>
+            <br><small class="text-muted">${waFillTemplate(t.texto, lead)}</small>
+        </a>
+    `).join('');
+
+    document.getElementById('wa-message').value = waFillTemplate(WA_TEMPLATES[0].texto, lead);
+    new bootstrap.Modal(document.getElementById('whatsappModal')).show();
+}
+
+function selectWhatsAppTemplate(idx) {
+    const lead = window._currentLeadData;
+    if (!lead) return;
+    document.getElementById('wa-message').value = waFillTemplate(WA_TEMPLATES[idx].texto, lead);
+}
+
+function sendWhatsApp() {
+    const lead = window._currentLeadData;
+    if (!lead || !lead.telefono) return;
+    const phone = waNormalizePhone(lead.telefono);
+    if (!phone) { alert('El teléfono no es válido.'); return; }
+    const message = document.getElementById('wa-message').value;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+    bootstrap.Modal.getInstance(document.getElementById('whatsappModal')).hide();
 }
 
 async function changeLeadEstado() {

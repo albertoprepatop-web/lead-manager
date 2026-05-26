@@ -483,6 +483,7 @@
                 <div id="detail-info" class="mb-3"></div>
                 <div class="d-flex gap-2 mb-3 flex-wrap">
                     <a id="detail-tel" href="#" class="btn btn-sm btn-outline-success"><i class="bi bi-telephone"></i> Llamar</a>
+                    <button class="btn btn-sm text-white" style="background-color:#25D366;border-color:#25D366;" onclick="openWhatsApp()"><i class="bi bi-whatsapp"></i> WhatsApp</button>
                     <a id="detail-email" href="#" class="btn btn-sm btn-outline-primary"><i class="bi bi-envelope"></i> Email</a>
                     <button class="btn btn-sm btn-outline-warning" onclick="openSeguimientoModal()"><i class="bi bi-bell-plus"></i> Seguimiento</button>
                     <button class="btn btn-sm btn-success" id="btn-matricular" onclick="openMatriculaModal()"><i class="bi bi-person-check"></i> Matricular</button>
@@ -1085,6 +1086,29 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="saveNewMes()"><i class="bi bi-check-lg"></i> Anadir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL WHATSAPP ═══════════════════ -->
+    <div class="modal fade" id="whatsappModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header text-white" style="background-color:#25D366;">
+                    <h5 class="modal-title"><i class="bi bi-whatsapp"></i> Enviar WhatsApp a <span id="wa-nombre"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2 small text-muted">Teléfono: <span id="wa-telefono" class="fw-bold"></span></div>
+                    <label class="form-label fw-bold mb-1">Elige una plantilla:</label>
+                    <div id="wa-templates" class="list-group mb-3" style="max-height:240px;overflow-y:auto;"></div>
+                    <label class="form-label fw-bold mb-1">Mensaje (puedes editarlo antes de enviar):</label>
+                    <textarea class="form-control" id="wa-message" rows="5"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn text-white" style="background-color:#25D366;" onclick="sendWhatsApp()"><i class="bi bi-whatsapp"></i> Abrir WhatsApp</button>
                 </div>
             </div>
         </div>
