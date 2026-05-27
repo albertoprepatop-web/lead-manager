@@ -989,6 +989,80 @@ def bulk_set_domiciliacion():
     return jsonify({'updated': updated, 'not_found': not_found})
 
 
+@app.route('/api/llamada-registrada', methods=['POST'])
+def llamada_registrada():
+    """Webhook for MacroDroid to register outgoing calls automatically.
+    Auth via shared token in header X-Token or query param token.
+    Body JSON: {phone, duration_seconds, timestamp (optional ISO), socio (optional: Alberto/Esteban)}
+    """
+    token = request.headers.get('X-Token') or request.args.get('token')
+    expected = os.environ.get('CALL_WEBHOOK_TOKEN', 'crm-calls-2026')
+    if token != expected:
+        return jsonify({'error': 'unauthorized'}), 401
+
+    data = request.get_json(silent=True) or {}
+    # MacroDroid may also send form-encoded
+    if not data:
+        data = request.form.to_dict()
+
+    phone = str(data.get('phone', '')).strip()
+    if not phone:
+        return jsonify({'error': 'phone required'}), 400
+    try:
+        duration = int(float(data.get('duration_seconds', 0)))
+    except Exception:
+        duration = 0
+    socio = data.get('socio', '')
+    ts_str = data.get('timestamp', '')
+    try:
+        ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00')) if ts_str else datetime.utcnow()
+    except Exception:
+        ts = datetime.utcnow()
+
+    # Normalize phone: keep only digits, last 9 are the local part
+    digits = ''.join(c for c in phone if c.isdigit())
+    last9 = digits[-9:] if len(digits) >= 9 else digits
+
+    # Find lead by phone (match last 9 digits)
+    lead = None
+    for candidate in Lead.query.filter(Lead.telefono != '').all():
+        cdigits = ''.join(c for c in (candidate.telefono or '') if c.isdigit())
+        if cdigits.endswith(last9) and len(last9) >= 7:
+            lead = candidate
+            break
+
+    if not lead:
+        return jsonify({'matched': False, 'phone': phone, 'message': 'No lead with that phone'}), 200
+
+    # Register call as nota
+    nota_text = f'Llamada {"saliente" if not socio else f"de {socio}"}: {duration}s'
+    nota = NotaActividad(lead_id=lead.id, tipo='llamada', contenido=nota_text, created_at=ts)
+    db.session.add(nota)
+
+    # Auto-update estado based on duration
+    estado_changed = None
+    if lead.estado in ('nuevo', 'no_coge', 'contactado'):
+        if duration == 0:
+            if lead.estado != 'no_coge':
+                lead.estado = 'no_coge'
+                estado_changed = 'no_coge'
+        elif duration > 30:
+            if lead.estado != 'contactado':
+                lead.estado = 'contactado'
+                lead.fecha_contacto = ts
+                estado_changed = 'contactado'
+
+    db.session.commit()
+    return jsonify({
+        'matched': True,
+        'lead_id': lead.id,
+        'lead_name': lead.nombre,
+        'duration': duration,
+        'estado': lead.estado,
+        'estado_changed': estado_changed,
+    }), 201
+
+
 @app.route('/api/upload-sepa', methods=['POST'])
 @login_required
 def upload_sepa():
