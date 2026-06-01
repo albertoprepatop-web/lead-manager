@@ -23,6 +23,8 @@ CRM_CODE = os.environ.get("CRM_CODE", "")
 PAGE_TOKEN = os.environ.get("META_PAGE_TOKEN", "")
 FORM_IDS = [f.strip() for f in os.environ.get("META_FORM_IDS", "1540464277680860").split(",") if f.strip()]
 STATE_FILE = Path(os.environ.get("STATE_FILE", "/tmp/meta_crm_state.json"))
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 ACADEMIA = "PREPARAANDALUCIA"
 
 SPECIALTY_MAP = {
@@ -57,6 +59,25 @@ def http_request(method, url, data=None, headers=None, cookies=None):
         return resp.status, resp.read().decode("utf-8", errors="replace"), dict(resp.headers)
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8", errors="replace"), dict(e.headers)
+
+
+def telegram_notify(text):
+    """Manda un mensaje a Telegram. No bloquea si falla (solo loguea)."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+    try:
+        code, body, _ = http_request("POST", url, data=payload, headers={"Content-Type": "application/json"})
+        if code != 200:
+            print(f"[telegram] HTTP {code}: {body[:200]}", file=sys.stderr)
+    except Exception as e:
+        print(f"[telegram] error: {e}", file=sys.stderr)
 
 
 def crm_login():
@@ -183,9 +204,19 @@ def main():
                 if ok:
                     print(f"    [ok]  {crm_data['nombre']} ({crm_data['telefono']}) -- {crm_data['especialidad']}")
                     total_new += 1
+                    telegram_notify(
+                        "📥 <b>Nuevo lead de Meta</b>\n"
+                        f"<b>{crm_data['nombre']}</b>\n"
+                        f"📞 {crm_data['telefono'] or '(sin teléfono)'}\n"
+                        f"✉️ {crm_data['email'] or '(sin email)'}\n"
+                        f"🎓 {crm_data['especialidad'] or '(sin especialidad)'}\n"
+                        f"🏫 {ACADEMIA}\n\n"
+                        f'<a href="{CRM_URL}">Abrir CRM</a>'
+                    )
                 else:
                     print(f"    [err] {msg}")
                     total_err += 1
+                    telegram_notify(f"⚠️ Error creando lead de Meta: {msg[:150]}")
             state["last_processed"][form_id] = meta_lead["id"]
             save_state(state)
     print(f"\nResumen: {total_new} nuevos, {total_dup} duplicados, {total_err} errores")
