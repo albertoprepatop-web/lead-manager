@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """
-Worker Meta Lead Ads -> CRM Multi-academia.
+Worker Meta Lead Ads -> CRM Multi-academia con detección de re-contacto.
+
+Para cada lead nuevo de Meta:
+  - Si NO existe en el CRM (por teléfono)  → lo crea y manda push.
+  - Si existe y su estado es "nuevo"       → silencio (es el mismo lead aún sin tocar).
+  - Si existe y ya fue contactado          → añade nota de "re-contacto" al lead
+                                              y dispara push de re-contacto.
+                                              Anti-spam: si la última nota de
+                                              re-contacto fue añadida hace <24h,
+                                              no añade nota ni push.
+
 Variables de entorno:
   CRM_URL              — URL base del CRM
   CRM_CODE             — Código de acceso del CRM
@@ -13,8 +23,10 @@ Variables de entorno:
                          {"PREPARAANDALUCIA":"topic-alberto",
                           "PREPARASECUNDARIA":"topic-diego"}
 """
+import datetime
 import json
 import os
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -28,6 +40,10 @@ PAGE_TOKEN_SEC = os.environ.get("META_PAGE_TOKEN_SEC", "")
 FORM_ACADEMIA_MAP = json.loads(os.environ.get("FORM_ACADEMIA_MAP", "{}"))
 NTFY_BY_ACADEMIA = json.loads(os.environ.get("NTFY_BY_ACADEMIA", "{}"))
 STATE_FILE = Path(os.environ.get("STATE_FILE", "/tmp/meta_crm_state.json"))
+
+# Marcador y cooldown para notas de re-contacto (lead que repite el form Meta)
+RECONTACT_PREFIX = "Volvió a rellenar form Meta"
+RECONTACT_COOLDOWN_SECONDS = 24 * 3600
 
 TOKEN_BY_ACADEMIA = {
     "PREPARAANDALUCIA": PAGE_TOKEN_AND,
@@ -92,27 +108,70 @@ def crm_create_lead(cookies, lead_data):
 
 _leads_cache = {}
 
-def crm_check_lead_exists(cookies, phone, academia):
+
+def _norm_phone(p):
+    return (p or "").replace(" ", "").replace("-", "").lstrip("+").lstrip("3").lstrip("4")[-9:]
+
+
+def crm_find_lead_by_phone(cookies, phone, academia):
+    """Devuelve el dict del lead existente en la academia (o None)."""
     if not phone:
-        return False
+        return None
     if academia not in _leads_cache:
         params = urllib.parse.urlencode({"academia": academia})
         code, body, _ = http_request("GET", f"{CRM_URL}/api/leads?{params}", cookies=cookies)
         if code != 200:
-            return False
+            return None
         try:
             _leads_cache[academia] = json.loads(body)
         except Exception:
-            return False
-    def norm(p):
-        return (p or "").replace(" ", "").replace("-", "").lstrip("+").lstrip("3").lstrip("4")[-9:]
-    target = norm(phone)
+            return None
+    target = _norm_phone(phone)
     if not target:
-        return False
+        return None
     for lead in _leads_cache[academia]:
-        if norm(lead.get("telefono")) == target:
-            return True
-    return False
+        if _norm_phone(lead.get("telefono")) == target:
+            return lead
+    return None
+
+
+def crm_update_lead(cookies, lead_id, updates):
+    """PUT /api/leads/{id} con los campos a actualizar. Devuelve (ok, body)."""
+    code, body, _ = http_request(
+        "PUT", f"{CRM_URL}/api/leads/{lead_id}",
+        data=updates, headers={"Content-Type": "application/json"}, cookies=cookies
+    )
+    if code in (200, 201, 204):
+        return True, body
+    return False, f"HTTP {code}: {body[:200]}"
+
+
+def parse_last_recontact_dt(notes):
+    """Devuelve datetime de la nota de re-contacto más reciente, o None."""
+    if not notes:
+        return None
+    pattern = re.escape(RECONTACT_PREFIX) + r' (\d{4}-\d{2}-\d{2} \d{2}:\d{2})'
+    matches = re.findall(pattern, notes)
+    if not matches:
+        return None
+    try:
+        return max(datetime.datetime.strptime(m, "%Y-%m-%d %H:%M") for m in matches)
+    except Exception:
+        return None
+
+
+def extract_hora_preferida(field_data_dict):
+    """Busca el valor de 'hora preferida' bajo varios nombres posibles."""
+    candidates = [
+        "hora_preferida", "hora_preferente", "horario", "horario_preferido",
+        "best_time_to_call", "preferred_time", "mejor_hora",
+        "cuando_te_puedo_llamar", "cuando_te_viene_bien",
+    ]
+    for key in candidates:
+        v = field_data_dict.get(key)
+        if v:
+            return v.strip()
+    return ""
 
 
 def meta_fetch_leads(form_id, token):
@@ -203,19 +262,60 @@ def main():
         print(f"  Form {form_id} [{academia}]: {len(new_leads)} nuevos")
         for meta_lead in new_leads:
             crm_data = meta_to_crm_format(meta_lead, academia)
-            if crm_check_lead_exists(crm_cookies, crm_data["telefono"], academia):
-                print(f"    [dup] {crm_data['nombre']} ({crm_data['telefono']})")
-                total_dup += 1
-            else:
+            existing = crm_find_lead_by_phone(crm_cookies, crm_data["telefono"], academia)
+
+            if existing is None:
+                # Lead totalmente nuevo
                 ok, msg = crm_create_lead(crm_cookies, crm_data)
                 if ok:
                     print(f"    [ok]  {crm_data['nombre']} ({crm_data['telefono']}) -- {crm_data['especialidad']}")
                     total_new += 1
-                    ntfy_send(academia, f"Nuevo lead {academia}",
-                              f"{crm_data['nombre']}\nTel: {crm_data['telefono']}\nEsp: {crm_data['especialidad']}")
+                    ntfy_send(
+                        academia, f"Nuevo lead {academia}",
+                        f"{crm_data['nombre']}\nTel: {crm_data['telefono']}\nEsp: {crm_data['especialidad']}",
+                    )
                 else:
                     print(f"    [err] {msg}")
                     total_err += 1
+            elif existing.get("estado") == "nuevo":
+                # Duplicado pero aún sin contactar — silencio total
+                print(f"    [dup-pending] {crm_data['nombre']} ({crm_data['telefono']})")
+                total_dup += 1
+            else:
+                # Re-contacto: lead que ya fue tocado y vuelve a rellenar el form
+                now_dt = datetime.datetime.now()
+                last_rc = parse_last_recontact_dt(existing.get("notas") or "")
+                if last_rc and (now_dt - last_rc).total_seconds() < RECONTACT_COOLDOWN_SECONDS:
+                    print(f"    [recontact-mute] {crm_data['nombre']} (<24h desde último re-contacto)")
+                    total_dup += 1
+                else:
+                    fd = {f["name"]: (f["values"][0] if f["values"] else "") for f in meta_lead.get("field_data", [])}
+                    hora_pref = extract_hora_preferida(fd) or "(no indicada)"
+                    ad_id = meta_lead.get("ad_id", "")
+                    esp = crm_data["especialidad"] or "(sin)"
+                    now_str = now_dt.strftime("%Y-%m-%d %H:%M")
+                    new_note = (
+                        f"{RECONTACT_PREFIX} {now_str} - Esp: {esp} "
+                        f"- Hora pref: {hora_pref} - Ad: {ad_id}"
+                    )
+                    prev_notes = existing.get("notas") or ""
+                    updated_notes = (prev_notes + "\n" + new_note) if prev_notes else new_note
+                    ok, msg = crm_update_lead(crm_cookies, existing["id"], {"notas": updated_notes})
+                    if ok:
+                        print(f"    [recontact] {crm_data['nombre']} (estado={existing.get('estado')})")
+                        existing["notas"] = updated_notes  # mantener cache coherente
+                        ntfy_send(
+                            academia,
+                            f"Re-contacto {academia}: {crm_data['nombre']}",
+                            f"Estado anterior: {existing.get('estado')}\n"
+                            f"Esp: {esp}\n"
+                            f"Tel: {crm_data['telefono']}\n"
+                            f"Fecha cita anterior: {existing.get('fecha_cita') or '(sin cita)'}",
+                        )
+                        total_dup += 1
+                    else:
+                        print(f"    [recontact-err] {msg}")
+                        total_err += 1
             state["last_processed"][form_id] = meta_lead["id"]
             save_state(state)
     print(f"\nResumen: {total_new} nuevos, {total_dup} duplicados, {total_err} errores")
