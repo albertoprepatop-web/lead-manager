@@ -660,7 +660,7 @@ const WA_ACADEMIA_NOMBRES = {
 const WA_TEMPLATES = [
     {
         titulo: 'Te he llamado y no lo has cogido',
-        texto: '¡Hola {nombre}! Soy Alberto de {academia}. Te he llamado porque aún tenemos plazas para el próximo curso y me gustaría contarte cómo trabajamos antes de que se cierren las inscripciones. Sin compromiso, simplemente para que decidas con toda la información. ¿A qué hora te viene mejor que te llame? ¡Un saludo!'
+        texto: '¡Hola {nombre}! Soy Alberto de {academia}. Te he llamado, cuando puedas me devuelves la llamada. Aún nos queda alguna plaza libre para la especialidad de {especialidad}. ¡Un saludo!'
     },
     {
         titulo: 'Info tras hablar',
@@ -695,7 +695,11 @@ function waNormalizePhone(tel) {
 function waFillTemplate(text, lead) {
     const nombre = (lead.nombre || '').trim().split(/\s+/)[0] || '';
     const academia = WA_ACADEMIA_NOMBRES[lead.academia] || lead.academia || '';
-    return text.replace(/\{nombre\}/g, nombre).replace(/\{academia\}/g, academia);
+    const especialidad = (lead.especialidad || '').trim() || 'tu interés';
+    return text
+        .replace(/\{nombre\}/g, nombre)
+        .replace(/\{academia\}/g, academia)
+        .replace(/\{especialidad\}/g, especialidad);
 }
 
 function openWhatsApp() {
