@@ -1383,6 +1383,104 @@ def db_check():
 
 
 # ═════════════════════════════════════════════════════════════════════════
+# CALL LOG (Tasker → /api/calls/log)
+# ═════════════════════════════════════════════════════════════════════════
+#
+# Endpoint que reciben los webhooks del móvil (Tasker en Android) cuando
+# termina una llamada con un lead. Si encuentra al lead por teléfono,
+# crea una NotaActividad tipo "llamada" con dirección y duración.
+#
+# Autenticación: header X-CRM-Token = CALL_LOG_TOKEN.
+# POST body JSON:
+#   {
+#     "phone": "+34612345678" o "612345678",
+#     "direction": "outgoing" | "incoming",
+#     "duration_seconds": 142,
+#     "timestamp": "2026-06-02T15:30:00Z"  (opcional)
+#   }
+
+
+def _norm_phone_for_match(p):
+    """Normaliza teléfonos para comparar (mismo criterio que el worker)."""
+    if not p:
+        return ""
+    d = str(p).replace(" ", "").replace("-", "").lstrip("+")
+    if d.startswith("00"):
+        d = d[2:]
+    if d.startswith("34") and len(d) == 11:
+        d = d[2:]
+    return d[-9:] if len(d) >= 9 else ""
+
+
+@app.route("/api/calls/log", methods=["POST"])
+def log_call():
+    # Auth por token
+    expected = os.environ.get("CALL_LOG_TOKEN", "")
+    if not expected:
+        return jsonify({"error": "CALL_LOG_TOKEN no configurado en el servidor"}), 500
+    provided = request.headers.get("X-CRM-Token") or (request.get_json(silent=True) or {}).get("token", "")
+    if provided != expected:
+        return jsonify({"error": "Token inválido"}), 401
+
+    data = request.get_json(silent=True) or {}
+    phone = (data.get("phone") or "").strip()
+    direction = (data.get("direction") or "outgoing").strip().lower()
+    try:
+        duration_sec = int(data.get("duration_seconds") or 0)
+    except (ValueError, TypeError):
+        duration_sec = 0
+
+    if not phone:
+        return jsonify({"error": "Falta 'phone' en el body"}), 400
+
+    target = _norm_phone_for_match(phone)
+    if not target:
+        return jsonify({"error": "Teléfono no válido", "phone": phone}), 400
+
+    # Buscar lead por teléfono normalizado
+    lead = None
+    for l in Lead.query.all():
+        if _norm_phone_for_match(l.telefono) == target:
+            lead = l
+            break
+
+    if not lead:
+        return jsonify({
+            "lead_found": False,
+            "phone_normalized": target,
+            "message": f"Sin lead asociado al número (terminado en {target[-9:]})",
+        }), 200
+
+    # Formato de duración legible
+    if duration_sec >= 60:
+        duration_str = f"{duration_sec // 60} min {duration_sec % 60:02d} s"
+    elif duration_sec > 0:
+        duration_str = f"{duration_sec} s"
+    else:
+        duration_str = "sin contestar"
+
+    dir_label = "Llamada saliente" if direction == "outgoing" else "Llamada entrante"
+    contenido = f"{dir_label} ({duration_str})"
+
+    nota = NotaActividad(
+        lead_id=lead.id,
+        contenido=contenido,
+        tipo="llamada",
+    )
+    db.session.add(nota)
+    db.session.commit()
+
+    return jsonify({
+        "lead_found": True,
+        "lead_id": lead.id,
+        "lead_nombre": lead.nombre,
+        "lead_academia": lead.academia,
+        "nota_id": nota.id,
+        "contenido": contenido,
+    })
+
+
+# ═════════════════════════════════════════════════════════════════════════
 # META ADS DASHBOARD
 # ═════════════════════════════════════════════════════════════════════════
 
