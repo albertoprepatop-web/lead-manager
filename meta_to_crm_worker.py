@@ -164,9 +164,13 @@ def parse_last_recontact_dt(notes):
 def extract_hora_preferida(field_data_dict):
     """Busca el valor de 'hora preferida' bajo varios nombres posibles."""
     candidates = [
+        # Reales de Meta vistos en formularios actuales
+        "call_time",                # PA_2026_06_FORM_v4_NOINGLES: "¿A qué hora podemos llamarte?"
+        # Otras variantes habituales
         "hora_preferida", "hora_preferente", "horario", "horario_preferido",
         "best_time_to_call", "preferred_time", "mejor_hora",
-        "cuando_te_puedo_llamar", "cuando_te_viene_bien",
+        "cuando_te_puedo_llamar", "cuando_te_viene_bien", "cuando_podemos_llamarte",
+        "a_que_hora_podemos_llamarte", "a_que_hora_te_puedo_llamar",
     ]
     for key in candidates:
         v = field_data_dict.get(key)
