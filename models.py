@@ -24,6 +24,7 @@ class Lead(db.Model):
     especialidad = db.Column(db.String(100), default='')
     fecha_contacto = db.Column(db.DateTime, nullable=True)
     fecha_cita = db.Column(db.DateTime, nullable=True)
+    hora_preferida = db.Column(db.String(50), default='')
     notas = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -42,6 +43,7 @@ class Lead(db.Model):
             'especialidad': self.especialidad,
             'fecha_contacto': self.fecha_contacto.isoformat() if self.fecha_contacto else None,
             'fecha_cita': self.fecha_cita.isoformat() if self.fecha_cita else None,
+            'hora_preferida': self.hora_preferida or '',
             'notas': self.notas,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,

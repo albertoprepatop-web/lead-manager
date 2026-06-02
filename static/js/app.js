@@ -590,6 +590,7 @@ async function openLeadDetail(id) {
         <div class="mb-1"><i class="bi bi-envelope me-2"></i>${lead.email || '-'}</div>
         <div class="mb-1"><i class="bi bi-building me-2"></i><span class="badge badge-${lead.academia.toLowerCase()}">${lead.academia}</span></div>
         ${lead.especialidad ? `<div class="mb-1"><i class="bi bi-mortarboard me-2"></i>Especialidad: ${lead.especialidad}</div>` : ''}
+        ${lead.hora_preferida ? `<div class="mb-1 text-info"><i class="bi bi-clock me-2"></i>Hora preferida: <strong>${lead.hora_preferida}</strong></div>` : ''}
         ${lead.fecha_contacto ? `<div class="mb-1"><i class="bi bi-telephone-forward me-2"></i>Contactado: ${formatDate(lead.fecha_contacto)}</div>` : ''}
         ${lead.fecha_cita ? `<div class="mb-1 text-warning fw-bold"><i class="bi bi-calendar-event me-2"></i>Cita: ${formatDate(lead.fecha_cita)}</div>` : ''}
         <div class="mb-1"><i class="bi bi-clock me-2"></i>Creado: ${formatDate(lead.created_at)}</div>
@@ -1115,6 +1116,7 @@ function openCarpetaModal(estado) {
                     <div>
                         <strong>${l.nombre}</strong>
                         ${l.telefono ? `<br><small class="text-muted"><i class="bi bi-telephone"></i> ${l.telefono}</small>` : ''}
+                        ${l.hora_preferida ? `<br><small class="text-info"><i class="bi bi-clock"></i> ${l.hora_preferida}</small>` : ''}
                     </div>
                     <div>
                         <span class="badge badge-${l.academia.toLowerCase()}">${l.academia}</span>
@@ -1172,6 +1174,7 @@ async function loadPipeline() {
                     ${l.especialidad ? `<span class="badge bg-secondary" style="font-size:0.6rem">${l.especialidad}</span>` : ''}
                 </div>
                 ${l.telefono ? `<div class="lead-meta mt-1"><i class="bi bi-telephone"></i> ${l.telefono}</div>` : ''}
+                ${l.hora_preferida ? `<div class="lead-meta mt-1 text-info"><i class="bi bi-clock"></i> ${l.hora_preferida}</div>` : ''}
                 ${l.llamadas > 0 ? `<div class="lead-meta mt-1"><i class="bi bi-telephone-outbound text-primary"></i> <small>${l.llamadas} llamada${l.llamadas > 1 ? 's' : ''}</small></div>` : ''}
                 ${l.fecha_cita ? `<div class="lead-meta mt-1 text-warning"><i class="bi bi-calendar-event"></i> ${formatDate(l.fecha_cita)}</div>` : ''}
             </div>

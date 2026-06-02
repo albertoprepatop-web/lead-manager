@@ -48,6 +48,8 @@ with app.app_context():
         lead_columns = [c['name'] for c in inspector.get_columns('leads')]
         if 'fecha_cita' not in lead_columns:
             db.session.execute(text('ALTER TABLE leads ADD COLUMN fecha_cita TIMESTAMP'))
+        if 'hora_preferida' not in lead_columns:
+            db.session.execute(text("ALTER TABLE leads ADD COLUMN hora_preferida VARCHAR(50) DEFAULT ''"))
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -288,6 +290,7 @@ def create_lead():
         academia=data['academia'],
         estado=data.get('estado', 'nuevo'),
         especialidad=data.get('especialidad', ''),
+        hora_preferida=data.get('hora_preferida', ''),
         notas=data.get('notas', ''),
     )
     db.session.add(lead)
@@ -389,6 +392,8 @@ def update_lead(lead_id):
         lead.fecha_contacto = datetime.fromisoformat(data['fecha_contacto'])
     if 'fecha_cita' in data and data['fecha_cita']:
         lead.fecha_cita = datetime.fromisoformat(data['fecha_cita'])
+    if 'hora_preferida' in data:
+        lead.hora_preferida = data['hora_preferida'] or ''
     if 'notas' in data:
         lead.notas = data['notas']
 

@@ -60,7 +60,8 @@ SPECIALTY_MAPS = {
     },
     "PREPARASECUNDARIA": {
         "lengua_castellana": "Lengua Castellana",
-        "historia": "Historia",
+        "historia": "Geografía e Historia",
+        "geografia_e_historia": "Geografía e Historia",
         "musica": "Música",
         "tecnologia": "Tecnología",
         "ingles": "Inglés",
@@ -197,12 +198,14 @@ def meta_to_crm_format(meta_lead, academia):
         telefono = "+" + telefono
     esp_raw = (fd.get("specialty") or fd.get("cual_es_tu_especialidad") or "").strip().lower()
     especialidad = SPECIALTY_MAPS.get(academia, {}).get(esp_raw, esp_raw or "")
+    hora_pref = extract_hora_preferida(fd)
     return {
         "nombre": nombre or "(Sin nombre)",
         "email": email,
         "telefono": telefono,
         "academia": academia,
         "especialidad": especialidad,
+        "hora_preferida": hora_pref,
         "estado": "nuevo",
         "notas": f"Lead Meta. campaign={meta_lead.get('campaign_id','')}, ad={meta_lead.get('ad_id','')}, lead_id={meta_lead.get('id','')}",
     }
@@ -270,10 +273,14 @@ def main():
                 if ok:
                     print(f"    [ok]  {crm_data['nombre']} ({crm_data['telefono']}) -- {crm_data['especialidad']}")
                     total_new += 1
-                    ntfy_send(
-                        academia, f"Nuevo lead {academia}",
-                        f"{crm_data['nombre']}\nTel: {crm_data['telefono']}\nEsp: {crm_data['especialidad']}",
+                    body = (
+                        f"{crm_data['nombre']}\n"
+                        f"Tel: {crm_data['telefono']}\n"
+                        f"Esp: {crm_data['especialidad']}"
                     )
+                    if crm_data.get("hora_preferida"):
+                        body += f"\nHora pref: {crm_data['hora_preferida']}"
+                    ntfy_send(academia, f"Nuevo lead {academia}", body)
                 else:
                     print(f"    [err] {msg}")
                     total_err += 1
@@ -290,7 +297,8 @@ def main():
                     total_dup += 1
                 else:
                     fd = {f["name"]: (f["values"][0] if f["values"] else "") for f in meta_lead.get("field_data", [])}
-                    hora_pref = extract_hora_preferida(fd) or "(no indicada)"
+                    hora_pref_raw = extract_hora_preferida(fd)
+                    hora_pref = hora_pref_raw or "(no indicada)"
                     ad_id = meta_lead.get("ad_id", "")
                     esp = crm_data["especialidad"] or "(sin)"
                     now_str = now_dt.strftime("%Y-%m-%d %H:%M")
@@ -300,18 +308,24 @@ def main():
                     )
                     prev_notes = existing.get("notas") or ""
                     updated_notes = (prev_notes + "\n" + new_note) if prev_notes else new_note
-                    ok, msg = crm_update_lead(crm_cookies, existing["id"], {"notas": updated_notes})
+                    updates = {"notas": updated_notes}
+                    if hora_pref_raw:
+                        # Si el lead ha cambiado su preferencia, la actualizamos
+                        updates["hora_preferida"] = hora_pref_raw
+                    ok, msg = crm_update_lead(crm_cookies, existing["id"], updates)
                     if ok:
                         print(f"    [recontact] {crm_data['nombre']} (estado={existing.get('estado')})")
                         existing["notas"] = updated_notes  # mantener cache coherente
-                        ntfy_send(
-                            academia,
-                            f"Re-contacto {academia}: {crm_data['nombre']}",
+                        if hora_pref_raw:
+                            existing["hora_preferida"] = hora_pref_raw
+                        body = (
                             f"Estado anterior: {existing.get('estado')}\n"
                             f"Esp: {esp}\n"
                             f"Tel: {crm_data['telefono']}\n"
-                            f"Fecha cita anterior: {existing.get('fecha_cita') or '(sin cita)'}",
+                            f"Hora pref: {hora_pref}\n"
+                            f"Fecha cita anterior: {existing.get('fecha_cita') or '(sin cita)'}"
                         )
+                        ntfy_send(academia, f"Re-contacto {academia}: {crm_data['nombre']}", body)
                         total_dup += 1
                     else:
                         print(f"    [recontact-err] {msg}")
