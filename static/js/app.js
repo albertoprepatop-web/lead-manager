@@ -76,6 +76,10 @@ function switchAcademia(academia) {
         document.getElementById('subtabs-general').style.display = 'none';
         document.getElementById('subtabs-academia').style.display = 'none';
         showView('economica');
+    } else if (academia === 'META') {
+        document.getElementById('subtabs-general').style.display = 'none';
+        document.getElementById('subtabs-academia').style.display = 'none';
+        showView('meta');
     } else if (academia === '') {
         document.getElementById('subtabs-general').style.display = 'flex';
         document.getElementById('subtabs-academia').style.display = 'none';
@@ -1941,21 +1945,59 @@ function renderMetaHistorical(h) {
 }
 
 function renderMetaSummary(s) {
-    const cplColor = _metaCplColor(s.cpl_today);
-    const ctrColor = _metaCtrColor(s.ctr_today);
+    const ctrColor = _metaCplColor(s.cpl_today); // alias
+    const ctrCls = _metaCtrColor(s.ctr_today);
+
     const deltaLeads = s.leads_delta;
     let deltaIcon = '', deltaText = '', deltaCls = 'text-muted';
     if (deltaLeads > 0) { deltaIcon = '↑'; deltaText = `+${deltaLeads} vs ayer`; deltaCls = 'text-success'; }
     else if (deltaLeads < 0) { deltaIcon = '↓'; deltaText = `${deltaLeads} vs ayer`; deltaCls = 'text-danger'; }
     else { deltaText = 'igual que ayer'; }
 
-    const budgetTxt = s.daily_budget != null ? `/ ${_metaFormatEur(s.daily_budget)} día` : '';
+    const budgetTxt = s.daily_budget != null ? ` / ${_metaFormatEur(s.daily_budget)} presupuesto día` : '';
     const statusBadge = s.campaign_status === 'ACTIVE'
         ? '<span class="badge bg-success">Activa</span>'
         : `<span class="badge bg-secondary">${s.campaign_status || '—'}</span>`;
 
+    // CPL hero: color de fondo según threshold
+    let cplGradient, cplLabel;
+    if (s.cpl_today == null) {
+        cplGradient = 'linear-gradient(135deg,#6c757d 0%,#495057 100%)';
+        cplLabel = 'Sin datos todavía';
+    } else if (s.cpl_today < 6) {
+        cplGradient = 'linear-gradient(135deg,#198754 0%,#0f5132 100%)';
+        cplLabel = '✓ Excelente — por debajo de 6€ por lead';
+    } else if (s.cpl_today <= 10) {
+        cplGradient = 'linear-gradient(135deg,#fd7e14 0%,#b35d09 100%)';
+        cplLabel = '⚠ Aceptable — entre 6€ y 10€ por lead';
+    } else {
+        cplGradient = 'linear-gradient(135deg,#dc3545 0%,#a82a37 100%)';
+        cplLabel = '✕ Caro — más de 10€ por lead, revisar';
+    }
+
+    const cplValue = s.cpl_today != null ? _metaFormatEur(s.cpl_today) : '—';
+
     document.getElementById('meta-summary').innerHTML = `
-        <div class="col-md-3 col-sm-6">
+        <!-- CPL HERO -->
+        <div class="col-12 mb-3">
+            <div class="card border-0 shadow-lg" style="background:${cplGradient};color:white;border-radius:1rem;">
+                <div class="card-body text-center py-5 px-3">
+                    <div class="text-uppercase fw-semibold opacity-75" style="font-size:.95rem;letter-spacing:.15em">
+                        <i class="bi bi-tag-fill"></i> Coste por cada lead
+                    </div>
+                    <div class="fw-bold mt-2" style="font-size:6rem;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,0.25)">
+                        ${cplValue}
+                    </div>
+                    <div class="opacity-90 mt-3 fs-5">${cplLabel}</div>
+                    <div class="opacity-75 small mt-2">
+                        Cuanto menor sea este número, mejor está funcionando la campaña.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3 KPIs SECUNDARIOS -->
+        <div class="col-md-4 col-sm-6">
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body">
                     <div class="text-muted small mb-1"><i class="bi bi-people"></i> Leads hoy</div>
@@ -1964,7 +2006,7 @@ function renderMetaSummary(s) {
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6">
+        <div class="col-md-4 col-sm-6">
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body">
                     <div class="text-muted small mb-1"><i class="bi bi-cash-coin"></i> Gasto hoy</div>
@@ -1973,20 +2015,11 @@ function renderMetaSummary(s) {
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6">
+        <div class="col-md-4 col-sm-6">
             <div class="card h-100 border-0 shadow-sm">
                 <div class="card-body">
-                    <div class="text-muted small mb-1" title="Cost Per Lead - cuánto cuesta cada formulario relleno"><i class="bi bi-tag"></i> CPL actual</div>
-                    <div class="display-5 fw-bold ${cplColor}">${s.cpl_today != null ? _metaFormatEur(s.cpl_today) : '—'}</div>
-                    <div class="small text-muted">verde &lt;6€ · ámbar 6-10€ · rojo &gt;10€</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small mb-1" title="Click-Through Rate - % de gente que clica del que ve"><i class="bi bi-mouse"></i> CTR</div>
-                    <div class="display-5 fw-bold ${ctrColor}">${s.ctr_today != null ? s.ctr_today.toFixed(2) + '%' : '—'}</div>
+                    <div class="text-muted small mb-1" title="Click-Through Rate — % de gente que clica del que ve el anuncio"><i class="bi bi-mouse"></i> CTR (tasa de click)</div>
+                    <div class="display-5 fw-bold ${ctrCls}">${s.ctr_today != null ? s.ctr_today.toFixed(2) + '%' : '—'}</div>
                     <div class="small text-muted">verde &gt;1,5% · ámbar 0,8-1,5% · rojo &lt;0,8%</div>
                 </div>
             </div>
