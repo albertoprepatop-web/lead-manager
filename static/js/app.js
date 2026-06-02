@@ -1779,20 +1779,23 @@ async function loadMeta(academia, fresh) {
 
     const qs = fresh ? '?fresh=1' : '';
     try {
-        const [summary, timeseries, ads] = await Promise.all([
+        const [summary, timeseries, ads, historical] = await Promise.all([
             fetch(`/api/meta/summary/${academia}${qs}`).then(r => r.json()),
             fetch(`/api/meta/timeseries/${academia}${qs}`).then(r => r.json()),
             fetch(`/api/meta/ads/${academia}${qs}`).then(r => r.json()),
+            fetch(`/api/meta/historical/${academia}${qs}`).then(r => r.json()),
         ]);
 
-        // Errores se exponen como {error: "..."} con HTTP 200
-        const firstError = [summary, timeseries, ads].find(r => r && r.error);
-        if (firstError) {
-            _metaShowError(firstError.error);
+        // Los 3 principales son críticos. El histórico es secundario:
+        // si falla, mostramos el resto y un mensaje suave en su tarjeta.
+        const firstCriticalError = [summary, timeseries, ads].find(r => r && r.error);
+        if (firstCriticalError) {
+            _metaShowError(firstCriticalError.error);
             _metaSetLoader(false);
             return;
         }
 
+        renderMetaHistorical(historical);
         renderMetaSummary(summary);
         renderMetaChart(timeseries.days || []);
         metaAdsData = ads.ads || [];
@@ -1814,6 +1817,127 @@ async function loadMeta(academia, fresh) {
             if (currentView === 'meta') loadMeta(currentMetaAcademia, true);
         }, 5 * 60 * 1000);
     }
+}
+
+function renderMetaHistorical(h) {
+    const body = document.getElementById('meta-historical-body');
+
+    // Error específico del endpoint
+    if (h.error) {
+        body.innerHTML = `<div class="text-muted small"><i class="bi bi-info-circle"></i> No se ha podido cargar la comparativa: ${h.error}</div>`;
+        return;
+    }
+    // Sin histórico previo (caso PS sin leads anteriores)
+    if (!h.has_historical) {
+        body.innerHTML = `
+            <div class="text-center py-3">
+                <i class="bi bi-info-circle text-muted" style="font-size:1.5rem"></i>
+                <div class="text-muted mt-2">Sin histórico previo de captación de leads en esta academia.</div>
+                <small class="text-muted">La comparativa aparecerá cuando haya datos de campañas anteriores.</small>
+            </div>`;
+        return;
+    }
+
+    const hist = h.historical, cur = h.current, imp = h.improvement, lpe = h.leads_per_100_eur;
+    const cplPct = imp.cpl_pct, ctrPct = imp.ctr_pct;
+
+    // Tarjetas con % y flecha
+    const pctCard = (label, pct, valueOld, valueNew, unit, betterIsLower) => {
+        let icon = '', cls = 'text-muted', sign = '';
+        if (pct === null || pct === undefined) {
+            return `
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="text-muted small mb-2">${label}</div>
+                            <div class="display-5 fw-bold text-muted">—</div>
+                            <div class="small text-muted">Sin datos suficientes</div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+        const isBetter = pct > 0;
+        cls = isBetter ? 'text-success' : (pct < 0 ? 'text-danger' : 'text-muted');
+        icon = isBetter ? '↗' : (pct < 0 ? '↘' : '');
+        sign = pct > 0 ? '+' : '';
+        const oldS = valueOld != null ? `${valueOld}${unit}` : '—';
+        const newS = valueNew != null ? `${valueNew}${unit}` : '—';
+        return `
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <div class="text-muted small mb-2">${label}</div>
+                        <div class="fw-bold ${cls}" style="font-size:3rem;line-height:1">${sign}${pct.toFixed(0)}% ${icon}</div>
+                        <div class="small text-muted mt-2">De <strong>${oldS}</strong> a <strong>${newS}</strong></div>
+                    </div>
+                </div>
+            </div>`;
+    };
+
+    // Para CPL la "mejora positiva" significa que bajó. Por eso el signo viene del backend ya correcto:
+    //   cpl_pct positivo = bajó CPL (mejor)
+    //   ctr_pct positivo = subió CTR (mejor)
+    // Mostramos directamente.
+    const cplBlock = pctCard('CPL — Coste por lead', cplPct, hist.cpl, cur.cpl, '€', true);
+    const ctrBlock = pctCard('CTR — Tasa de click', ctrPct, hist.ctr, cur.ctr, '%', false);
+
+    // Mini bar chart horizontal (solo CPL, en CSS)
+    let barChart = '';
+    if (hist.cpl && cur.cpl) {
+        const histWidth = 100;
+        const curWidth = Math.max(2, (cur.cpl / hist.cpl) * 100);
+        const curColor = cur.cpl < hist.cpl ? '#198754' : '#dc3545';
+        barChart = `
+            <div class="mt-3 mb-2">
+                <div class="d-flex align-items-center mb-2">
+                    <div style="width:90px" class="text-muted small">Histórico</div>
+                    <div class="flex-grow-1 mx-2"><div style="background:#6c757d;height:22px;width:${histWidth}%;border-radius:4px"></div></div>
+                    <strong style="min-width:70px;text-align:right">${hist.cpl.toFixed(2)} €</strong>
+                </div>
+                <div class="d-flex align-items-center">
+                    <div style="width:90px" class="text-muted small">Ahora</div>
+                    <div class="flex-grow-1 mx-2"><div style="background:${curColor};height:22px;width:${curWidth}%;border-radius:4px"></div></div>
+                    <strong style="min-width:70px;text-align:right" class="${cur.cpl < hist.cpl ? 'text-success' : 'text-danger'}">${cur.cpl.toFixed(2)} €</strong>
+                </div>
+            </div>`;
+    }
+
+    // Párrafo explicativo en lenguaje plano (sin siglas)
+    let paragraph = '';
+    if (cplPct !== null && cplPct !== undefined && hist.cpl && cur.cpl) {
+        const better = cplPct > 0;
+        if (better) {
+            const lpOld = lpe.old != null ? Math.round(lpe.old) : null;
+            const lpNew = lpe.new != null ? Math.round(lpe.new) : null;
+            const lpClause = (lpOld != null && lpNew != null)
+                ? ` Por cada 100 € invertidos, ahora consigues <strong>${lpNew} personas interesadas</strong> en lugar de ${lpOld}.`
+                : '';
+            paragraph = `
+                <div class="alert alert-success mb-0 mt-3">
+                    <i class="bi bi-emoji-smile"></i>
+                    Tu publicidad antes te cobraba <strong>${hist.cpl.toFixed(2)} €</strong> por cada persona interesada.
+                    Ahora te cuesta <strong>${cur.cpl.toFixed(2)} €</strong>.
+                    Has mejorado un <strong>${cplPct.toFixed(0)}%</strong>.${lpClause}
+                </div>`;
+        } else {
+            paragraph = `
+                <div class="alert alert-warning mb-0 mt-3">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Tu coste por persona interesada ha <strong>empeorado un ${Math.abs(cplPct).toFixed(0)}%</strong>
+                    (de ${hist.cpl.toFixed(2)} € a ${cur.cpl.toFixed(2)} €). Conviene revisar la campaña.
+                </div>`;
+        }
+    }
+
+    body.innerHTML = `
+        <div class="row g-3">${cplBlock}${ctrBlock}</div>
+        ${barChart}
+        ${paragraph}
+        <div class="text-muted small mt-2">
+            <i class="bi bi-info-circle"></i>
+            Histórico = ${hist.campaigns_count} campañas previas (lifetime). Actual = ${cur.campaign_name || 'campaña actual'} (lifetime).
+        </div>
+    `;
 }
 
 function renderMetaSummary(s) {

@@ -1672,6 +1672,112 @@ def meta_ads(academia):
     return jsonify(result)
 
 
+@app.route("/api/meta/historical/<academia>")
+@login_required
+def meta_historical(academia):
+    cfg, err = _meta_config_or_error(academia)
+    if err:
+        return err
+    if not cfg["ad_account"]:
+        return jsonify({"error": f"Falta META_AD_ACCOUNT_{academia.upper()} para comparar con histórico"})
+
+    cache_key = ("historical", academia)
+    if not request.args.get("fresh"):
+        cached = meta_cache_get(cache_key)
+        if cached:
+            return jsonify({**cached, "from_cache": True})
+
+    # 1) Insights de TODAS las campañas de la cuenta — lifetime
+    data = meta_graph_get(f"{cfg['ad_account']}/insights", {
+        "level": "campaign",
+        "date_preset": "maximum",
+        "fields": "campaign_id,campaign_name,spend,actions,impressions,clicks,ctr",
+        "limit": "200",
+    }, cfg["token"])
+
+    if "error" in data:
+        return jsonify({"error": data["error"].get("message", "Error Meta API")})
+
+    historical_rows = []
+    current_row = None
+    for row in data.get("data", []):
+        if row.get("campaign_id") == cfg["campaign_id"]:
+            current_row = row
+        else:
+            historical_rows.append(row)
+
+    # Agregar histórico (todas las campañas excepto la actual)
+    h_spend = sum(float(r.get("spend") or 0) for r in historical_rows)
+    h_leads = sum(_extract_leads(r) for r in historical_rows)
+    h_impressions = sum(int(r.get("impressions") or 0) for r in historical_rows)
+    h_clicks = sum(int(r.get("clicks") or 0) for r in historical_rows)
+    h_cpl = (h_spend / h_leads) if h_leads > 0 else None
+    h_ctr = (h_clicks / h_impressions * 100) if h_impressions > 0 else None
+
+    # Si la actual no aparece (raro pero posible si está sin gasto), pedirla directa
+    if current_row is None:
+        cur = meta_graph_get(f"{cfg['campaign_id']}/insights", {
+            "date_preset": "maximum",
+            "fields": "spend,actions,impressions,clicks,ctr,campaign_name",
+        }, cfg["token"])
+        if "error" not in cur:
+            current_row = (cur.get("data") or [{}])[0]
+        else:
+            current_row = {}
+
+    c_spend = float(current_row.get("spend") or 0)
+    c_leads = _extract_leads(current_row)
+    c_impressions = int(current_row.get("impressions") or 0)
+    c_clicks = int(current_row.get("clicks") or 0)
+    c_cpl = (c_spend / c_leads) if c_leads > 0 else None
+    c_ctr = (c_clicks / c_impressions * 100) if c_impressions > 0 else None
+
+    # Mejora (% relativo)
+    #   CPL: menos es mejor → mejora = (h - c) / h * 100, positivo = mejor
+    #   CTR: más es mejor → mejora = (c - h) / h * 100, positivo = mejor
+    cpl_improvement = None
+    if h_cpl is not None and c_cpl is not None and h_cpl > 0:
+        cpl_improvement = (h_cpl - c_cpl) / h_cpl * 100
+    ctr_improvement = None
+    if h_ctr is not None and c_ctr is not None and h_ctr > 0:
+        ctr_improvement = (c_ctr - h_ctr) / h_ctr * 100
+
+    # Texto explicativo (lenguaje plano). Si hay mejora CPL,
+    # calcula cuántos leads/100€ obtienes ahora vs antes.
+    leads_per_100_old = (100 / h_cpl) if h_cpl else None
+    leads_per_100_new = (100 / c_cpl) if c_cpl else None
+
+    result = {
+        "has_historical": (h_leads > 0 and h_cpl is not None),
+        "historical": {
+            "spend": round(h_spend, 2),
+            "leads": h_leads,
+            "cpl": round(h_cpl, 2) if h_cpl else None,
+            "ctr": round(h_ctr, 2) if h_ctr else None,
+            "campaigns_count": len(historical_rows),
+        },
+        "current": {
+            "spend": round(c_spend, 2),
+            "leads": c_leads,
+            "cpl": round(c_cpl, 2) if c_cpl else None,
+            "ctr": round(c_ctr, 2) if c_ctr else None,
+            "campaign_name": current_row.get("campaign_name", ""),
+        },
+        "improvement": {
+            "cpl_pct": round(cpl_improvement, 1) if cpl_improvement is not None else None,
+            "ctr_pct": round(ctr_improvement, 1) if ctr_improvement is not None else None,
+        },
+        "leads_per_100_eur": {
+            "old": round(leads_per_100_old, 1) if leads_per_100_old else None,
+            "new": round(leads_per_100_new, 1) if leads_per_100_new else None,
+        },
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "from_cache": False,
+    }
+    meta_cache_set(cache_key, result)
+    return jsonify(result)
+
+
 @app.route("/api/meta/ad/<ad_id>/creative")
 @login_required
 def meta_ad_creative(ad_id):
