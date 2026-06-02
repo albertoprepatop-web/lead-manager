@@ -7,6 +7,13 @@ let chartMeses = null;
 let chartAlumnosMes = null;
 let pendingContactoLeadId = null;
 let pendingContactoSource = null; // 'detail' or 'quick'
+// Meta dashboard state
+let currentMetaAcademia = 'and';
+let metaChart = null;
+let metaAdsData = [];
+let metaSortField = 'spend';
+let metaSortDir = 'desc';
+let metaAutoRefreshTimer = null;
 
 const ACADEMIA_COLORS = {
     PREPATOP: '#2563EB',
@@ -106,6 +113,13 @@ function showView(view) {
     else if (view === 'seguimientos') loadSeguimientos();
     else if (view === 'economica') loadEconomica();
     else if (view === 'socios') loadSocios();
+    else if (view === 'meta') loadMeta();
+
+    // Cancelar auto-refresh de Meta si nos vamos a otra vista
+    if (view !== 'meta' && metaAutoRefreshTimer) {
+        clearInterval(metaAutoRefreshTimer);
+        metaAutoRefreshTimer = null;
+    }
 }
 
 // ── API Helper ────────────────────────────────────────────────────────────
@@ -1686,4 +1700,329 @@ async function deleteRegistroEfectivo(id) {
     if (!confirm('Eliminar este registro?')) return;
     await api(`/api/registro-efectivo/${id}`, { method: 'DELETE' });
     loadSocios();
+}
+
+// ═══════════════════ META ADS DASHBOARD ═══════════════════
+
+function _metaShowError(msg) {
+    const el = document.getElementById('meta-error');
+    el.style.cssText = ''; // remove inline display:none
+    el.style.display = 'flex';
+    document.getElementById('meta-error-msg').textContent = msg;
+    document.getElementById('meta-content').style.display = 'none';
+}
+
+function _metaHideError() {
+    const el = document.getElementById('meta-error');
+    el.style.cssText = 'display:none !important';
+}
+
+function _metaSetLoader(visible) {
+    document.getElementById('meta-loader').style.display = visible ? 'block' : 'none';
+}
+
+function _metaFormatEur(n) {
+    if (n === null || n === undefined) return '—';
+    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n);
+}
+
+function _metaFormatNum(n) {
+    if (n === null || n === undefined) return '—';
+    return new Intl.NumberFormat('es-ES').format(n);
+}
+
+function _metaCplColor(cpl) {
+    if (cpl === null || cpl === undefined) return 'text-muted';
+    if (cpl < 6) return 'text-success';
+    if (cpl <= 10) return 'text-warning';
+    return 'text-danger';
+}
+
+function _metaCtrColor(ctr) {
+    if (ctr === null || ctr === undefined) return 'text-muted';
+    if (ctr > 1.5) return 'text-success';
+    if (ctr >= 0.8) return 'text-warning';
+    return 'text-danger';
+}
+
+function _metaAgo(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const diffMs = Date.now() - d.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'hace unos segundos';
+    if (mins === 1) return 'hace 1 minuto';
+    if (mins < 60) return `hace ${mins} minutos`;
+    const hours = Math.floor(mins / 60);
+    return hours === 1 ? 'hace 1 hora' : `hace ${hours} horas`;
+}
+
+function toggleMetaGlosario() {
+    const el = document.getElementById('meta-glosario');
+    el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+}
+
+function switchMetaAcademia(code) {
+    currentMetaAcademia = code;
+    document.querySelectorAll('#meta-subnav .nav-link').forEach(a => a.classList.remove('active'));
+    document.getElementById(`meta-tab-${code}`).classList.add('active');
+    loadMeta(code, false);
+}
+
+async function loadMeta(academia, fresh) {
+    if (!academia) academia = currentMetaAcademia;
+    currentMetaAcademia = academia;
+    _metaHideError();
+    _metaSetLoader(true);
+    document.getElementById('meta-content').style.display = 'none';
+    document.getElementById('meta-last-update').textContent = 'Cargando…';
+
+    const qs = fresh ? '?fresh=1' : '';
+    try {
+        const [summary, timeseries, ads] = await Promise.all([
+            fetch(`/api/meta/summary/${academia}${qs}`).then(r => r.json()),
+            fetch(`/api/meta/timeseries/${academia}${qs}`).then(r => r.json()),
+            fetch(`/api/meta/ads/${academia}${qs}`).then(r => r.json()),
+        ]);
+
+        // Errores se exponen como {error: "..."} con HTTP 200
+        const firstError = [summary, timeseries, ads].find(r => r && r.error);
+        if (firstError) {
+            _metaShowError(firstError.error);
+            _metaSetLoader(false);
+            return;
+        }
+
+        renderMetaSummary(summary);
+        renderMetaChart(timeseries.days || []);
+        metaAdsData = ads.ads || [];
+        renderMetaAdsTable();
+
+        document.getElementById('meta-last-update').innerHTML =
+            `<i class="bi bi-clock-history"></i> Última actualización: ${_metaAgo(summary.updated_at)}` +
+            (summary.from_cache ? ' <span class="badge bg-secondary">caché</span>' : '');
+        document.getElementById('meta-content').style.display = 'block';
+    } catch (e) {
+        _metaShowError('No se han podido cargar los datos (red o servidor).');
+    } finally {
+        _metaSetLoader(false);
+    }
+
+    // Auto-refresh cada 5 min
+    if (!metaAutoRefreshTimer) {
+        metaAutoRefreshTimer = setInterval(() => {
+            if (currentView === 'meta') loadMeta(currentMetaAcademia, true);
+        }, 5 * 60 * 1000);
+    }
+}
+
+function renderMetaSummary(s) {
+    const cplColor = _metaCplColor(s.cpl_today);
+    const ctrColor = _metaCtrColor(s.ctr_today);
+    const deltaLeads = s.leads_delta;
+    let deltaIcon = '', deltaText = '', deltaCls = 'text-muted';
+    if (deltaLeads > 0) { deltaIcon = '↑'; deltaText = `+${deltaLeads} vs ayer`; deltaCls = 'text-success'; }
+    else if (deltaLeads < 0) { deltaIcon = '↓'; deltaText = `${deltaLeads} vs ayer`; deltaCls = 'text-danger'; }
+    else { deltaText = 'igual que ayer'; }
+
+    const budgetTxt = s.daily_budget != null ? `/ ${_metaFormatEur(s.daily_budget)} día` : '';
+    const statusBadge = s.campaign_status === 'ACTIVE'
+        ? '<span class="badge bg-success">Activa</span>'
+        : `<span class="badge bg-secondary">${s.campaign_status || '—'}</span>`;
+
+    document.getElementById('meta-summary').innerHTML = `
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small mb-1"><i class="bi bi-people"></i> Leads hoy</div>
+                    <div class="display-5 fw-bold">${_metaFormatNum(s.leads_today)}</div>
+                    <div class="small ${deltaCls}">${deltaIcon} ${deltaText}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small mb-1"><i class="bi bi-cash-coin"></i> Gasto hoy</div>
+                    <div class="display-5 fw-bold">${_metaFormatEur(s.spend_today)}</div>
+                    <div class="small text-muted">${budgetTxt} ${statusBadge}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small mb-1" title="Cost Per Lead - cuánto cuesta cada formulario relleno"><i class="bi bi-tag"></i> CPL actual</div>
+                    <div class="display-5 fw-bold ${cplColor}">${s.cpl_today != null ? _metaFormatEur(s.cpl_today) : '—'}</div>
+                    <div class="small text-muted">verde &lt;6€ · ámbar 6-10€ · rojo &gt;10€</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small mb-1" title="Click-Through Rate - % de gente que clica del que ve"><i class="bi bi-mouse"></i> CTR</div>
+                    <div class="display-5 fw-bold ${ctrColor}">${s.ctr_today != null ? s.ctr_today.toFixed(2) + '%' : '—'}</div>
+                    <div class="small text-muted">verde &gt;1,5% · ámbar 0,8-1,5% · rojo &lt;0,8%</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderMetaChart(days) {
+    const ctx = document.getElementById('meta-chart').getContext('2d');
+    if (metaChart) { metaChart.destroy(); metaChart = null; }
+
+    const labels = days.map(d => {
+        if (!d.date) return '';
+        const [y, m, dd] = d.date.split('-');
+        return `${dd}/${m}`;
+    });
+    const spend = days.map(d => d.spend);
+    const leads = days.map(d => d.leads);
+
+    metaChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Leads',
+                    data: leads,
+                    backgroundColor: 'rgba(13, 110, 253, 0.6)',
+                    borderColor: '#0d6efd',
+                    yAxisID: 'yLeads',
+                    order: 2,
+                },
+                {
+                    type: 'line',
+                    label: 'Gasto (€)',
+                    data: spend,
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25,135,84,0.1)',
+                    tension: 0.25,
+                    fill: false,
+                    yAxisID: 'ySpend',
+                    order: 1,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        afterBody: (items) => {
+                            const idx = items[0].dataIndex;
+                            const d = days[idx];
+                            const cplStr = d.cpl != null ? d.cpl.toFixed(2) + ' €' : '—';
+                            return [
+                                `Impresiones: ${_metaFormatNum(d.impressions)}`,
+                                `Clicks: ${_metaFormatNum(d.clicks)}`,
+                                `CTR: ${d.ctr.toFixed(2)}%`,
+                                `CPL: ${cplStr}`,
+                            ];
+                        }
+                    }
+                },
+                legend: { position: 'bottom' },
+            },
+            scales: {
+                ySpend: {
+                    position: 'left',
+                    title: { display: true, text: 'Gasto (€)' },
+                    beginAtZero: true,
+                },
+                yLeads: {
+                    position: 'right',
+                    title: { display: true, text: 'Leads' },
+                    beginAtZero: true,
+                    grid: { drawOnChartArea: false },
+                    ticks: { stepSize: 1, precision: 0 },
+                },
+            },
+        },
+    });
+}
+
+function sortMetaAds(field) {
+    if (metaSortField === field) {
+        metaSortDir = metaSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        metaSortField = field;
+        metaSortDir = (field === 'ad_name' || field === 'status') ? 'asc' : 'desc';
+    }
+    renderMetaAdsTable();
+}
+
+function renderMetaAdsTable() {
+    const filter = document.getElementById('meta-ads-filter').value;
+    let rows = metaAdsData.slice();
+    if (filter === 'active') {
+        rows = rows.filter(a => /ACTIVE/i.test(a.status));
+    }
+    rows.sort((a, b) => {
+        const va = a[metaSortField], vb = b[metaSortField];
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === 'string') {
+            return metaSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        return metaSortDir === 'asc' ? va - vb : vb - va;
+    });
+
+    const statusBadge = (s) => {
+        if (/ACTIVE/i.test(s)) return `<span class="badge bg-success">Activo</span>`;
+        if (/PAUSED/i.test(s)) return `<span class="badge bg-warning text-dark">Pausado</span>`;
+        if (/DISAPPROVED|REJECTED/i.test(s)) return `<span class="badge bg-danger">${s}</span>`;
+        return `<span class="badge bg-secondary">${s || '—'}</span>`;
+    };
+
+    const tbody = document.getElementById('meta-ads-tbody');
+    if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-3">Sin anuncios para mostrar</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = rows.map(a => `
+        <tr>
+            <td>${a.ad_name}</td>
+            <td>${statusBadge(a.status)}</td>
+            <td class="text-end">${_metaFormatNum(a.impressions)}</td>
+            <td class="text-end">${_metaFormatNum(a.clicks)}</td>
+            <td class="text-end ${_metaCtrColor(a.ctr)}">${a.ctr ? a.ctr.toFixed(2) + '%' : '—'}</td>
+            <td class="text-end">${_metaFormatEur(a.spend)}</td>
+            <td class="text-end"><strong>${a.leads}</strong></td>
+            <td class="text-end ${_metaCplColor(a.cpl)} fw-bold">${a.cpl != null ? _metaFormatEur(a.cpl) : '—'}</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-primary" onclick="openMetaCreativeModal('${a.ad_id}', ${JSON.stringify(a.ad_name)})"><i class="bi bi-image"></i></button></td>
+        </tr>
+    `).join('');
+}
+
+async function openMetaCreativeModal(adId, adName) {
+    document.getElementById('meta-creative-title').textContent = adName;
+    document.getElementById('meta-creative-img').style.display = 'none';
+    document.getElementById('meta-creative-error').style.display = 'none';
+    document.getElementById('meta-creative-loader').style.display = 'block';
+    new bootstrap.Modal(document.getElementById('metaCreativeModal')).show();
+
+    try {
+        const data = await fetch(`/api/meta/ad/${adId}/creative?academia=${currentMetaAcademia}`).then(r => r.json());
+        document.getElementById('meta-creative-loader').style.display = 'none';
+        if (data.error || !data.image_url) {
+            document.getElementById('meta-creative-error').style.display = 'block';
+            return;
+        }
+        const img = document.getElementById('meta-creative-img');
+        img.src = data.image_url;
+        img.style.display = 'inline-block';
+    } catch (e) {
+        document.getElementById('meta-creative-loader').style.display = 'none';
+        document.getElementById('meta-creative-error').style.display = 'block';
+    }
 }

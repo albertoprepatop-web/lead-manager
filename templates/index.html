@@ -43,6 +43,7 @@
             <button class="sub-tab active" onclick="showView('dashboard')"><i class="bi bi-speedometer2"></i> Dashboard</button>
             <button class="sub-tab" onclick="showView('alumnos')"><i class="bi bi-person-check"></i> Todos los Alumnos</button>
             <button class="sub-tab" onclick="showView('seguimientos')"><i class="bi bi-calendar-check"></i> Seguimientos</button>
+            <button class="sub-tab" onclick="showView('meta')"><i class="bi bi-megaphone-fill"></i> Meta Ads</button>
         </div>
         <!-- Academy sub-tabs (hidden by default) -->
         <div class="sub-tab-group" id="subtabs-academia" style="display:none">
@@ -469,6 +470,145 @@
                         <thead><tr><th>Fecha</th><th>Socio</th><th>Concepto</th><th>Cantidad</th><th></th></tr></thead>
                         <tbody id="socios-registro"></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════ META ADS DASHBOARD ═══════════════════ -->
+        <div id="view-meta" style="display:none">
+            <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+                <h5 class="mb-0"><i class="bi bi-megaphone-fill"></i> Meta Ads — Dashboard</h5>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <small class="text-muted" id="meta-last-update">Cargando…</small>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleMetaGlosario()" id="meta-glosario-btn">
+                        <i class="bi bi-question-circle"></i> ¿Qué significa cada cosa?
+                    </button>
+                    <button class="btn btn-sm btn-primary" onclick="loadMeta(null, true)">
+                        <i class="bi bi-arrow-clockwise"></i> Actualizar ahora
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sub-pestañas Andalucía / Secundaria -->
+            <ul class="nav nav-pills mb-3" id="meta-subnav">
+                <li class="nav-item"><a class="nav-link active" href="#" id="meta-tab-and" onclick="event.preventDefault();switchMetaAcademia('and')">🟧 Andalucía</a></li>
+                <li class="nav-item"><a class="nav-link" href="#" id="meta-tab-sec" onclick="event.preventDefault();switchMetaAcademia('sec')">🟩 Secundaria</a></li>
+            </ul>
+
+            <!-- Glosario (colapsable) -->
+            <div class="card mb-3" id="meta-glosario" style="display:none">
+                <div class="card-header bg-light"><strong><i class="bi bi-book"></i> Glosario rápido</strong></div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row mb-0 small">
+                                <dt class="col-sm-4">Impresiones</dt>
+                                <dd class="col-sm-8">Veces que se ha mostrado el anuncio (puede ser la misma persona varias veces).</dd>
+                                <dt class="col-sm-4">Alcance</dt>
+                                <dd class="col-sm-8">Personas <em>distintas</em> que han visto el anuncio.</dd>
+                                <dt class="col-sm-4">Frecuencia</dt>
+                                <dd class="col-sm-8">Veces de media que cada persona ha visto el anuncio. <span class="text-warning">&gt;3 indica fatiga creativa.</span></dd>
+                                <dt class="col-sm-4">CTR</dt>
+                                <dd class="col-sm-8"><em>Click-Through Rate</em>. % de la gente que clica del que ve. <span class="text-success">&gt;1,5% es excelente.</span></dd>
+                                <dt class="col-sm-4">CPC</dt>
+                                <dd class="col-sm-8"><em>Cost Per Click</em>. Cuánto pagas por cada click.</dd>
+                                <dt class="col-sm-4">CPM</dt>
+                                <dd class="col-sm-8"><em>Cost Per Mille</em>. Cuánto cuesta llegar a 1.000 personas.</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row mb-0 small">
+                                <dt class="col-sm-4">Lead</dt>
+                                <dd class="col-sm-8">Persona que ha rellenado el formulario.</dd>
+                                <dt class="col-sm-4">CPL</dt>
+                                <dd class="col-sm-8"><em>Cost Per Lead</em>. Cuánto cuesta conseguir un lead. <strong>La métrica más importante.</strong></dd>
+                                <dt class="col-sm-4">Ad / Anuncio</dt>
+                                <dd class="col-sm-8">Cada pieza creativa (imagen + texto).</dd>
+                                <dt class="col-sm-4">Adset</dt>
+                                <dd class="col-sm-8"><em>Conjunto de anuncios</em>. Grupo de anuncios con público y presupuesto compartido.</dd>
+                                <dt class="col-sm-4">Campaña</dt>
+                                <dd class="col-sm-8">Contenedor que agrupa varios adsets.</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error -->
+            <div class="alert alert-warning d-flex align-items-center" id="meta-error" style="display:none !important">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span id="meta-error-msg"></span>
+            </div>
+
+            <!-- Loader -->
+            <div id="meta-loader" class="text-center my-4" style="display:none">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="text-muted small mt-2">Cargando datos de Meta…</div>
+            </div>
+
+            <div id="meta-content" style="display:none">
+                <!-- Sección 1: Resumen rápido (4 tarjetas) -->
+                <div class="row g-3 mb-4" id="meta-summary"></div>
+
+                <!-- Sección 2: Gráfica 14d -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong><i class="bi bi-graph-up"></i> Evolución últimos 14 días</strong>
+                        <small class="text-muted">Gasto (€) y leads por día</small>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="meta-chart" style="max-height:320px"></canvas>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Tabla de anuncios -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <strong><i class="bi bi-card-list"></i> Rendimiento por anuncio <small class="text-muted">(últimos 14 días)</small></strong>
+                        <div class="d-flex align-items-center gap-2">
+                            <select class="form-select form-select-sm" id="meta-ads-filter" style="width:auto" onchange="renderMetaAdsTable()">
+                                <option value="active">Solo activos</option>
+                                <option value="all">Todos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm mb-0" id="meta-ads-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('ad_name')">Anuncio</th>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('status')">Estado</th>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('impressions')" class="text-end">Impresiones</th>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('clicks')" class="text-end">Clicks</th>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('ctr')" class="text-end">CTR</th>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('spend')" class="text-end">Gasto</th>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('leads')" class="text-end">Leads</th>
+                                        <th style="cursor:pointer" onclick="sortMetaAds('cpl')" class="text-end">CPL</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="meta-ads-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════ MODAL CREATIVIDAD META ═══════════════════ -->
+        <div class="modal fade" id="metaCreativeModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-image"></i> Creatividad — <span id="meta-creative-title"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div id="meta-creative-loader" class="text-center my-4"><div class="spinner-border"></div></div>
+                        <img id="meta-creative-img" src="" alt="" style="max-width:100%;max-height:60vh;display:none" class="rounded">
+                        <div id="meta-creative-error" class="text-muted" style="display:none">No se ha podido cargar la imagen del anuncio.</div>
+                    </div>
                 </div>
             </div>
         </div>

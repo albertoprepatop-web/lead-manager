@@ -1,7 +1,12 @@
 import csv
 import io
+import json
 import os
 import functools
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 
 from flask import Flask, jsonify, render_template, request, Response, session, redirect, url_for
@@ -1375,6 +1380,342 @@ def db_check():
         'has_fecha_contacto': has_fecha_contacto,
         'db_url_prefix': db_url[:20] + '...',
     })
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# META ADS DASHBOARD
+# ═════════════════════════════════════════════════════════════════════════
+
+META_GRAPH_VERSION = "v25.0"
+META_CACHE_TTL = 300  # 5 minutos
+_meta_cache = {}  # {(endpoint, *args): (timestamp, data)}
+
+# action_types que Meta usa para "lead" (depende del tipo de campaña)
+LEAD_ACTION_TYPES = {
+    "lead",
+    "onsite_conversion.lead_grouped",
+    "leadgen.other",
+    "offsite_conversion.fb_pixel_lead",
+}
+
+
+def meta_cache_get(key):
+    entry = _meta_cache.get(key)
+    if entry and (time.time() - entry[0]) < META_CACHE_TTL:
+        return entry[1]
+    return None
+
+
+def meta_cache_set(key, data):
+    _meta_cache[key] = (time.time(), data)
+
+
+def meta_graph_get(path, params, token):
+    """GET a Meta Graph API. Devuelve dict (con 'error' si falla)."""
+    params = {**params, "access_token": token}
+    url = f"https://graph.facebook.com/{META_GRAPH_VERSION}/{path}?{urllib.parse.urlencode(params)}"
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+            return {"error": body.get("error", {"message": str(body)})}
+        except Exception:
+            return {"error": {"message": f"HTTP {e.code}"}}
+    except Exception as e:
+        return {"error": {"message": str(e)}}
+
+
+def get_meta_academy_config(academia_code):
+    """academia_code: 'and' o 'sec'. Devuelve dict de config o None."""
+    if academia_code == "and":
+        return {
+            "code": "and",
+            "name": "PREPARAANDALUCIA",
+            "label": "Andalucía",
+            "token": os.environ.get("META_PAGE_TOKEN", ""),
+            "ad_account": os.environ.get("META_AD_ACCOUNT_AND", ""),
+            "campaign_id": os.environ.get("META_CAMPAIGN_AND", ""),
+        }
+    if academia_code == "sec":
+        return {
+            "code": "sec",
+            "name": "PREPARASECUNDARIA",
+            "label": "Secundaria",
+            "token": os.environ.get("META_PAGE_TOKEN_SEC", ""),
+            "ad_account": os.environ.get("META_AD_ACCOUNT_SEC", ""),
+            "campaign_id": os.environ.get("META_CAMPAIGN_SEC", ""),
+        }
+    return None
+
+
+def _meta_config_or_error(academia_code):
+    """Devuelve (cfg, error_response). Si error_response no es None, hay que devolverla."""
+    cfg = get_meta_academy_config(academia_code)
+    if not cfg:
+        return None, (jsonify({"error": "Academia inválida (use 'and' o 'sec')"}), 400)
+    missing = [k for k in ("token", "campaign_id") if not cfg[k]]
+    if missing:
+        return None, (jsonify({
+            "error": f"Faltan variables de entorno: {', '.join(missing)} para {cfg['name']}",
+            "missing": missing,
+        }), 200)
+    return cfg, None
+
+
+def _extract_leads(row):
+    """Suma los 'actions' que correspondan a leads."""
+    total = 0
+    for a in (row.get("actions") or []):
+        if a.get("action_type") in LEAD_ACTION_TYPES:
+            try:
+                total += int(float(a.get("value", 0)))
+            except (ValueError, TypeError):
+                pass
+    return total
+
+
+@app.route("/api/meta/summary/<academia>")
+@login_required
+def meta_summary(academia):
+    cfg, err = _meta_config_or_error(academia)
+    if err:
+        return err
+
+    cache_key = ("summary", academia)
+    if not request.args.get("fresh"):
+        cached = meta_cache_get(cache_key)
+        if cached:
+            return jsonify({**cached, "from_cache": True})
+
+    # Insights HOY
+    today = meta_graph_get(f"{cfg['campaign_id']}/insights", {
+        "date_preset": "today",
+        "fields": "impressions,reach,frequency,clicks,ctr,cpc,cpm,spend,actions",
+    }, cfg["token"])
+    if "error" in today:
+        return jsonify({"error": today["error"].get("message", "Error Meta API")})
+
+    # Insights AYER (solo para variación)
+    yesterday = meta_graph_get(f"{cfg['campaign_id']}/insights", {
+        "date_preset": "yesterday",
+        "fields": "spend,actions",
+    }, cfg["token"])
+
+    # Info de la campaña (nombre, presupuesto, estado)
+    camp = meta_graph_get(cfg["campaign_id"], {
+        "fields": "name,status,daily_budget,lifetime_budget",
+    }, cfg["token"])
+
+    today_row = (today.get("data") or [{}])[0]
+    yesterday_row = (yesterday.get("data") or [{}])[0] if "error" not in yesterday else {}
+
+    leads_today = _extract_leads(today_row)
+    leads_yesterday = _extract_leads(yesterday_row)
+    spend_today = float(today_row.get("spend") or 0)
+    spend_yesterday = float(yesterday_row.get("spend") or 0)
+    ctr_today = float(today_row.get("ctr") or 0)
+    impressions_today = int(today_row.get("impressions") or 0)
+    clicks_today = int(today_row.get("clicks") or 0)
+
+    daily_budget_raw = camp.get("daily_budget")
+    daily_budget = (float(daily_budget_raw) / 100) if daily_budget_raw else None
+
+    cpl_today = round(spend_today / leads_today, 2) if leads_today > 0 else None
+
+    result = {
+        "academia": academia,
+        "campaign_name": camp.get("name", ""),
+        "campaign_status": camp.get("status", ""),
+        "leads_today": leads_today,
+        "leads_yesterday": leads_yesterday,
+        "leads_delta": leads_today - leads_yesterday,
+        "spend_today": round(spend_today, 2),
+        "spend_yesterday": round(spend_yesterday, 2),
+        "daily_budget": daily_budget,
+        "cpl_today": cpl_today,
+        "ctr_today": round(ctr_today, 2),
+        "impressions_today": impressions_today,
+        "clicks_today": clicks_today,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "from_cache": False,
+    }
+    meta_cache_set(cache_key, result)
+    return jsonify(result)
+
+
+@app.route("/api/meta/timeseries/<academia>")
+@login_required
+def meta_timeseries(academia):
+    cfg, err = _meta_config_or_error(academia)
+    if err:
+        return err
+
+    cache_key = ("timeseries", academia)
+    if not request.args.get("fresh"):
+        cached = meta_cache_get(cache_key)
+        if cached:
+            return jsonify({**cached, "from_cache": True})
+
+    data = meta_graph_get(f"{cfg['campaign_id']}/insights", {
+        "date_preset": "last_14d",
+        "time_increment": "1",
+        "fields": "impressions,clicks,spend,actions,ctr,cpc,date_start",
+        "limit": "50",
+    }, cfg["token"])
+
+    if "error" in data:
+        return jsonify({"error": data["error"].get("message", "Error Meta API")})
+
+    days = []
+    for row in data.get("data", []):
+        leads = _extract_leads(row)
+        spend = float(row.get("spend") or 0)
+        days.append({
+            "date": row.get("date_start"),
+            "impressions": int(row.get("impressions") or 0),
+            "clicks": int(row.get("clicks") or 0),
+            "spend": round(spend, 2),
+            "leads": leads,
+            "ctr": float(row.get("ctr") or 0),
+            "cpc": float(row.get("cpc") or 0),
+            "cpl": round(spend / leads, 2) if leads > 0 else None,
+        })
+    # Ordenar por fecha asc por si Meta los devuelve al revés
+    days.sort(key=lambda d: d["date"] or "")
+
+    result = {
+        "academia": academia,
+        "days": days,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "from_cache": False,
+    }
+    meta_cache_set(cache_key, result)
+    return jsonify(result)
+
+
+@app.route("/api/meta/ads/<academia>")
+@login_required
+def meta_ads(academia):
+    cfg, err = _meta_config_or_error(academia)
+    if err:
+        return err
+
+    cache_key = ("ads", academia)
+    if not request.args.get("fresh"):
+        cached = meta_cache_get(cache_key)
+        if cached:
+            return jsonify({**cached, "from_cache": True})
+
+    # Insights por anuncio (suma 14 días por defecto)
+    insights = meta_graph_get(f"{cfg['campaign_id']}/insights", {
+        "level": "ad",
+        "date_preset": "last_14d",
+        "fields": "ad_id,ad_name,impressions,clicks,ctr,spend,actions",
+        "limit": "100",
+    }, cfg["token"])
+
+    if "error" in insights:
+        return jsonify({"error": insights["error"].get("message", "Error Meta API")})
+
+    # Status de cada anuncio (otra llamada porque no viene en insights)
+    ads_meta = meta_graph_get(f"{cfg['campaign_id']}/ads", {
+        "fields": "id,name,status,effective_status",
+        "limit": "100",
+    }, cfg["token"])
+    status_map = {a["id"]: a for a in (ads_meta.get("data") or [])} if "error" not in ads_meta else {}
+
+    ads_list = []
+    for row in insights.get("data", []):
+        ad_id = row.get("ad_id", "")
+        leads = _extract_leads(row)
+        spend = float(row.get("spend") or 0)
+        meta_info = status_map.get(ad_id, {})
+        ads_list.append({
+            "ad_id": ad_id,
+            "ad_name": row.get("ad_name") or meta_info.get("name") or "(sin nombre)",
+            "status": meta_info.get("effective_status") or meta_info.get("status") or "",
+            "impressions": int(row.get("impressions") or 0),
+            "clicks": int(row.get("clicks") or 0),
+            "ctr": round(float(row.get("ctr") or 0), 2),
+            "spend": round(spend, 2),
+            "leads": leads,
+            "cpl": round(spend / leads, 2) if leads > 0 else None,
+        })
+
+    # Si hay ads en status_map que no tienen insights (sin gasto), añadirlos vacíos
+    seen_ids = {a["ad_id"] for a in ads_list}
+    for ad_id, info in status_map.items():
+        if ad_id not in seen_ids:
+            ads_list.append({
+                "ad_id": ad_id,
+                "ad_name": info.get("name") or "(sin nombre)",
+                "status": info.get("effective_status") or info.get("status") or "",
+                "impressions": 0,
+                "clicks": 0,
+                "ctr": 0,
+                "spend": 0,
+                "leads": 0,
+                "cpl": None,
+            })
+
+    ads_list.sort(key=lambda a: a["spend"], reverse=True)
+
+    result = {
+        "academia": academia,
+        "ads": ads_list,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "from_cache": False,
+    }
+    meta_cache_set(cache_key, result)
+    return jsonify(result)
+
+
+@app.route("/api/meta/ad/<ad_id>/creative")
+@login_required
+def meta_ad_creative(ad_id):
+    aca = request.args.get("academia", "and")
+    cfg, err = _meta_config_or_error(aca)
+    if err:
+        return err
+
+    cache_key = ("creative", ad_id)
+    cached = meta_cache_get(cache_key)
+    if cached:
+        return jsonify({**cached, "from_cache": True})
+
+    # Obtener creative del ad
+    creative_resp = meta_graph_get(ad_id, {
+        "fields": "creative{id,object_story_spec,image_url,thumbnail_url}",
+    }, cfg["token"])
+
+    if "error" in creative_resp:
+        return jsonify({"error": creative_resp["error"].get("message", "Error Meta API")})
+
+    cre = creative_resp.get("creative") or {}
+    image_url = cre.get("image_url") or cre.get("thumbnail_url")
+
+    if not image_url:
+        spec = cre.get("object_story_spec") or {}
+        link_data = spec.get("link_data") or {}
+        image_hash = link_data.get("image_hash")
+        video_data = spec.get("video_data") or {}
+        image_url = video_data.get("image_url") or video_data.get("thumbnail_url")
+
+        if not image_url and image_hash and cfg["ad_account"]:
+            images = meta_graph_get(f"{cfg['ad_account']}/adimages", {
+                "hashes": json.dumps([image_hash]),
+                "fields": "url,permalink_url,hash",
+            }, cfg["token"])
+            for img in (images.get("data") or []):
+                image_url = img.get("permalink_url") or img.get("url")
+                if image_url:
+                    break
+
+    result = {"image_url": image_url, "creative_id": cre.get("id")}
+    meta_cache_set(cache_key, result)
+    return jsonify(result)
 
 
 if __name__ == '__main__':
