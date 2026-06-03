@@ -10,6 +10,8 @@ let pendingContactoSource = null; // 'detail' or 'quick'
 // Meta dashboard state
 let currentMetaAcademia = 'and';
 let metaChart = null;
+let metaCplChart = null;
+let metaCompareChart = null;
 let metaAdsData = [];
 let metaSortField = 'spend';
 let metaSortDir = 'desc';
@@ -1787,15 +1789,15 @@ async function loadMeta(academia, fresh) {
 
     const qs = fresh ? '?fresh=1' : '';
     try {
-        const [summary, timeseries, ads, historical] = await Promise.all([
+        const [summary, timeseries, ads, historical, evolution] = await Promise.all([
             fetch(`/api/meta/summary/${academia}${qs}`).then(r => r.json()),
             fetch(`/api/meta/timeseries/${academia}${qs}`).then(r => r.json()),
             fetch(`/api/meta/ads/${academia}${qs}`).then(r => r.json()),
             fetch(`/api/meta/historical/${academia}${qs}`).then(r => r.json()),
+            fetch(`/api/meta/campaign_evolution/${academia}${qs}`).then(r => r.json()),
         ]);
 
-        // Los 3 principales son críticos. El histórico es secundario:
-        // si falla, mostramos el resto y un mensaje suave en su tarjeta.
+        // Los 3 principales son críticos. Historical y evolution son secundarios.
         const firstCriticalError = [summary, timeseries, ads].find(r => r && r.error);
         if (firstCriticalError) {
             _metaShowError(firstCriticalError.error);
@@ -1804,8 +1806,10 @@ async function loadMeta(academia, fresh) {
         }
 
         renderMetaHistorical(historical);
+        renderMetaLifetime(evolution);
         renderMetaSummary(summary);
         renderMetaChart(timeseries.days || []);
+        renderMetaCplChart(evolution.days || []);
         metaAdsData = ads.ads || [];
         renderMetaAdsTable();
 
@@ -1825,6 +1829,154 @@ async function loadMeta(academia, fresh) {
             if (currentView === 'meta') loadMeta(currentMetaAcademia, true);
         }, 5 * 60 * 1000);
     }
+}
+
+function renderMetaLifetime(e) {
+    const body = document.getElementById('meta-lifetime-body');
+    if (!body) return;
+    if (e && e.error) {
+        body.innerHTML = `<div class="text-muted small"><i class="bi bi-info-circle"></i> ${e.error}</div>`;
+        return;
+    }
+    if (!e || !e.totals) {
+        body.innerHTML = '<div class="text-muted small">Sin datos lifetime de la campaña.</div>';
+        return;
+    }
+    const t = e.totals;
+    document.getElementById('meta-lifetime-name').textContent =
+        (e.campaign_name || 'Campaña actual') + (t.start_date ? ` — desde ${_metaFormatDate(t.start_date)}` : '');
+
+    body.innerHTML = `
+        <div class="row g-3">
+            <div class="col-md-3 col-6">
+                <div class="text-center py-2">
+                    <div class="text-muted small text-uppercase" style="letter-spacing:.08em"><i class="bi bi-people-fill"></i> Total leads</div>
+                    <div class="fw-bold text-success" style="font-size:3rem;line-height:1.1">${_metaFormatNum(t.leads)}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="text-center py-2">
+                    <div class="text-muted small text-uppercase" style="letter-spacing:.08em"><i class="bi bi-cash-stack"></i> Total invertido</div>
+                    <div class="fw-bold" style="font-size:3rem;line-height:1.1">${_metaFormatEur(t.spend)}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="text-center py-2">
+                    <div class="text-muted small text-uppercase" style="letter-spacing:.08em"><i class="bi bi-tag-fill"></i> CPL medio</div>
+                    <div class="fw-bold ${_metaCplColor(t.cpl)}" style="font-size:3rem;line-height:1.1">${t.cpl != null ? _metaFormatEur(t.cpl) : '—'}</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="text-center py-2">
+                    <div class="text-muted small text-uppercase" style="letter-spacing:.08em"><i class="bi bi-calendar-range"></i> Días activos</div>
+                    <div class="fw-bold text-primary" style="font-size:3rem;line-height:1.1">${t.days_active || 0}</div>
+                </div>
+            </div>
+        </div>
+        ${t.ctr != null ? `
+        <div class="text-center mt-3 text-muted small">
+            CTR medio: <strong class="${_metaCtrColor(t.ctr)}">${t.ctr.toFixed(2)}%</strong>
+            &middot; ${_metaFormatNum(t.clicks)} clicks de ${_metaFormatNum(t.impressions)} impresiones
+        </div>` : ''}
+    `;
+}
+
+function _metaFormatDate(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return `${parseInt(d)} ${meses[parseInt(m) - 1]} ${y}`;
+}
+
+function renderMetaCplChart(days) {
+    const canvas = document.getElementById('meta-cpl-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (metaCplChart) { metaCplChart.destroy(); metaCplChart = null; }
+
+    // Filtramos días sin CPL (sin leads ese día)
+    const validDays = days.filter(d => d.cpl != null);
+    if (validDays.length === 0) {
+        canvas.style.display = 'none';
+        return;
+    }
+    canvas.style.display = '';
+
+    const labels = validDays.map(d => {
+        if (!d.date) return '';
+        const [y, m, dd] = d.date.split('-');
+        return `${dd}/${m}`;
+    });
+    const cplValues = validDays.map(d => d.cpl);
+
+    // Determinar valor máximo del eje Y (con margen para que se vean las bandas)
+    const maxCpl = Math.max(...cplValues, 12);
+
+    // Plugin para pintar las bandas de fondo (verde/ámbar/rojo)
+    const bandsPlugin = {
+        id: 'bandsBackground',
+        beforeDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea || !scales.y) return;
+            const ya = scales.y;
+            const top = chartArea.top, bottom = chartArea.bottom, left = chartArea.left, right = chartArea.right;
+            // Banda roja (> 10€)
+            const y10 = ya.getPixelForValue(10);
+            ctx.save();
+            ctx.fillStyle = 'rgba(220,53,69,0.10)';
+            ctx.fillRect(left, top, right - left, Math.max(0, y10 - top));
+            // Banda ámbar (6-10€)
+            const y6 = ya.getPixelForValue(6);
+            ctx.fillStyle = 'rgba(253,126,20,0.10)';
+            ctx.fillRect(left, y10, right - left, Math.max(0, y6 - y10));
+            // Banda verde (<6€)
+            ctx.fillStyle = 'rgba(25,135,84,0.10)';
+            ctx.fillRect(left, y6, right - left, Math.max(0, bottom - y6));
+            ctx.restore();
+        }
+    };
+
+    metaCplChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'CPL (€)',
+                data: cplValues,
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13,110,253,0.2)',
+                pointBackgroundColor: cplValues.map(v => v < 6 ? '#198754' : (v <= 10 ? '#fd7e14' : '#dc3545')),
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                borderWidth: 3,
+                tension: 0.3,
+                fill: false,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (item) => `CPL: ${item.parsed.y.toFixed(2)} €`,
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: Math.ceil(maxCpl * 1.1),
+                    title: { display: true, text: 'CPL (€)' },
+                    ticks: {
+                        callback: (v) => v + ' €'
+                    }
+                }
+            }
+        },
+        plugins: [bandsPlugin]
+    });
 }
 
 function renderMetaHistorical(h) {
@@ -1889,26 +2041,8 @@ function renderMetaHistorical(h) {
     const cplBlock = pctCard('CPL — Coste por lead', cplPct, hist.cpl, cur.cpl, '€', true);
     const ctrBlock = pctCard('CTR — Tasa de click', ctrPct, hist.ctr, cur.ctr, '%', false);
 
-    // Mini bar chart horizontal (solo CPL, en CSS)
-    let barChart = '';
-    if (hist.cpl && cur.cpl) {
-        const histWidth = 100;
-        const curWidth = Math.max(2, (cur.cpl / hist.cpl) * 100);
-        const curColor = cur.cpl < hist.cpl ? '#198754' : '#dc3545';
-        barChart = `
-            <div class="mt-3 mb-2">
-                <div class="d-flex align-items-center mb-2">
-                    <div style="width:90px" class="text-muted small">Histórico</div>
-                    <div class="flex-grow-1 mx-2"><div style="background:#6c757d;height:22px;width:${histWidth}%;border-radius:4px"></div></div>
-                    <strong style="min-width:70px;text-align:right">${hist.cpl.toFixed(2)} €</strong>
-                </div>
-                <div class="d-flex align-items-center">
-                    <div style="width:90px" class="text-muted small">Ahora</div>
-                    <div class="flex-grow-1 mx-2"><div style="background:${curColor};height:22px;width:${curWidth}%;border-radius:4px"></div></div>
-                    <strong style="min-width:70px;text-align:right" class="${cur.cpl < hist.cpl ? 'text-success' : 'text-danger'}">${cur.cpl.toFixed(2)} €</strong>
-                </div>
-            </div>`;
-    }
+    // Chart comparativo (CPL y CTR, antes vs ahora)
+    const barChart = `<div class="mt-3" style="max-width:520px;margin:0 auto"><canvas id="meta-compare-chart" style="max-height:240px"></canvas></div>`;
 
     // Párrafo explicativo en lenguaje plano (sin siglas)
     let paragraph = '';
@@ -1946,6 +2080,55 @@ function renderMetaHistorical(h) {
             Histórico = ${hist.campaigns_count} campañas previas (lifetime). Actual = ${cur.campaign_name || 'campaña actual'} (lifetime).
         </div>
     `;
+
+    // Chart comparativo (bar chart agrupado)
+    if (hist.cpl != null && cur.cpl != null) {
+        const canvas = document.getElementById('meta-compare-chart');
+        if (canvas) {
+            if (metaCompareChart) { metaCompareChart.destroy(); metaCompareChart = null; }
+            metaCompareChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['CPL (€)', 'CTR (%)'],
+                    datasets: [
+                        {
+                            label: 'Histórico',
+                            data: [hist.cpl, hist.ctr ?? 0],
+                            backgroundColor: '#6c757d',
+                            borderRadius: 4,
+                        },
+                        {
+                            label: 'Ahora',
+                            data: [cur.cpl, cur.ctr ?? 0],
+                            backgroundColor: [
+                                cur.cpl < hist.cpl ? '#198754' : '#dc3545',
+                                (cur.ctr ?? 0) > (hist.ctr ?? 0) ? '#198754' : '#dc3545',
+                            ],
+                            borderRadius: 4,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: (item) => {
+                                    const unit = item.label.includes('CPL') ? '€' : '%';
+                                    return `${item.dataset.label}: ${item.parsed.y.toFixed(2)} ${unit}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+    }
 }
 
 function renderMetaSummary(s) {

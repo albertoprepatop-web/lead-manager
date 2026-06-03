@@ -549,12 +549,12 @@
             </div>
 
             <div id="meta-content" style="display:none">
-                <!-- Sección 0: Comparativa Histórico -->
+                <!-- Sección 0: Comparativa Histórico (mejorada visualmente) -->
                 <div class="card mb-4 border-primary" id="meta-historical-card">
                     <div class="card-header bg-light d-flex justify-content-between align-items-center">
                         <strong>
                             <i class="bi bi-graph-up-arrow"></i> Comparativa: Antes vs Ahora
-                            <span class="text-muted ms-1" style="cursor:help" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Comparamos tu nueva campaña con el rendimiento medio de todas las campañas anteriores en esta cuenta publicitaria. Cuanto mejor sea la métrica nueva respecto a la antigua, mejor estás haciendo publicidad. Los datos se actualizan cada 5 minutos.">
+                            <span class="text-muted ms-1" style="cursor:help" title="Comparamos tu nueva campaña con el rendimiento medio de todas las campañas anteriores en esta cuenta publicitaria. Cuanto mejor sea la métrica nueva respecto a la antigua, mejor estás haciendo publicidad.">
                                 <i class="bi bi-question-circle"></i>
                             </span>
                         </strong>
@@ -563,10 +563,20 @@
                     <div class="card-body" id="meta-historical-body"></div>
                 </div>
 
-                <!-- Sección 1: Resumen rápido (4 tarjetas) -->
+                <!-- Sección 1: Total de la Nueva Campaña (lifetime) -->
+                <div class="card mb-4 border-success" id="meta-lifetime-card">
+                    <div class="card-header bg-success bg-opacity-10 d-flex justify-content-between align-items-center">
+                        <strong><i class="bi bi-trophy-fill text-success"></i> Total de la Nueva Campaña</strong>
+                        <small class="text-muted" id="meta-lifetime-name">CAMPAÑA CLAUDE — todo el periodo</small>
+                    </div>
+                    <div class="card-body" id="meta-lifetime-body"></div>
+                </div>
+
+                <!-- Sección 2: CPL hero + 3 KPIs hoy -->
+                <h6 class="text-muted text-uppercase mb-2 mt-4" style="font-size:.8rem;letter-spacing:.1em"><i class="bi bi-calendar-day"></i> Hoy</h6>
                 <div class="row g-3 mb-4" id="meta-summary"></div>
 
-                <!-- Sección 2: Gráfica 14d -->
+                <!-- Sección 3a: Gráfica 14d (combo: leads + gasto) -->
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <strong><i class="bi bi-graph-up"></i> Evolución últimos 14 días</strong>
@@ -574,6 +584,22 @@
                     </div>
                     <div class="card-body">
                         <canvas id="meta-chart" style="max-height:320px"></canvas>
+                    </div>
+                </div>
+
+                <!-- Sección 3b: Evolución del CPL desde inicio de campaña -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong><i class="bi bi-tag"></i> Evolución del coste por lead</strong>
+                        <small class="text-muted">Desde el inicio de la campaña actual</small>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="meta-cpl-chart" style="max-height:280px"></canvas>
+                        <div class="small text-muted mt-2 d-flex justify-content-center gap-3">
+                            <span><span class="d-inline-block rounded" style="width:14px;height:14px;background:#198754;vertical-align:middle"></span> Zona verde (&lt;6€)</span>
+                            <span><span class="d-inline-block rounded" style="width:14px;height:14px;background:#fd7e14;vertical-align:middle"></span> Zona ámbar (6-10€)</span>
+                            <span><span class="d-inline-block rounded" style="width:14px;height:14px;background:#dc3545;vertical-align:middle"></span> Zona roja (&gt;10€)</span>
+                        </div>
                     </div>
                 </div>
 

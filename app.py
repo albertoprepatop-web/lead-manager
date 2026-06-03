@@ -1770,6 +1770,87 @@ def meta_ads(academia):
     return jsonify(result)
 
 
+@app.route("/api/meta/campaign_evolution/<academia>")
+@login_required
+def meta_campaign_evolution(academia):
+    """
+    Evolución diaria de la campaña actual desde su inicio (lifetime).
+    Devuelve totales acumulados + array por día.
+    """
+    cfg, err = _meta_config_or_error(academia)
+    if err:
+        return err
+
+    cache_key = ("campaign_evolution", academia)
+    if not request.args.get("fresh"):
+        cached = meta_cache_get(cache_key)
+        if cached:
+            return jsonify({**cached, "from_cache": True})
+
+    data = meta_graph_get(f"{cfg['campaign_id']}/insights", {
+        "date_preset": "maximum",
+        "time_increment": "1",
+        "fields": "date_start,impressions,clicks,spend,actions,ctr,cpc",
+        "limit": "500",
+    }, cfg["token"])
+
+    if "error" in data:
+        return jsonify({"error": data["error"].get("message", "Error Meta API")})
+
+    days = []
+    for row in data.get("data", []):
+        leads = _extract_leads(row)
+        spend = float(row.get("spend") or 0)
+        days.append({
+            "date": row.get("date_start"),
+            "impressions": int(row.get("impressions") or 0),
+            "clicks": int(row.get("clicks") or 0),
+            "spend": round(spend, 2),
+            "leads": leads,
+            "ctr": float(row.get("ctr") or 0),
+            "cpl": round(spend / leads, 2) if leads > 0 else None,
+        })
+    days.sort(key=lambda d: d["date"] or "")
+
+    # Totales acumulados
+    total_spend = sum(d["spend"] for d in days)
+    total_leads = sum(d["leads"] for d in days)
+    total_impressions = sum(d["impressions"] for d in days)
+    total_clicks = sum(d["clicks"] for d in days)
+    avg_cpl = (total_spend / total_leads) if total_leads > 0 else None
+    avg_ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else None
+
+    # Días activos = días con gasto > 0
+    days_active = sum(1 for d in days if d["spend"] > 0)
+    start_date = next((d["date"] for d in days if d["spend"] > 0), None)
+    end_date = next((d["date"] for d in reversed(days) if d["spend"] > 0), None)
+
+    # Nombre de la campaña
+    camp = meta_graph_get(cfg["campaign_id"], {"fields": "name,status"}, cfg["token"])
+
+    result = {
+        "academia": academia,
+        "campaign_name": camp.get("name", "") if "error" not in camp else "",
+        "campaign_status": camp.get("status", "") if "error" not in camp else "",
+        "totals": {
+            "spend": round(total_spend, 2),
+            "leads": total_leads,
+            "impressions": total_impressions,
+            "clicks": total_clicks,
+            "cpl": round(avg_cpl, 2) if avg_cpl is not None else None,
+            "ctr": round(avg_ctr, 2) if avg_ctr is not None else None,
+            "days_active": days_active,
+            "start_date": start_date,
+            "end_date": end_date,
+        },
+        "days": days,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "from_cache": False,
+    }
+    meta_cache_set(cache_key, result)
+    return jsonify(result)
+
+
 @app.route("/api/meta/historical/<academia>")
 @login_required
 def meta_historical(academia):
