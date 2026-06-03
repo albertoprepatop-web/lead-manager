@@ -203,6 +203,16 @@ def meta_to_crm_format(meta_lead, academia):
     esp_raw = (fd.get("specialty") or fd.get("cual_es_tu_especialidad") or "").strip().lower()
     especialidad = SPECIALTY_MAPS.get(academia, {}).get(esp_raw, esp_raw or "")
     hora_pref = extract_hora_preferida(fd)
+
+    # Filtro automático: si el lead marcó NO tener título homologado en España,
+    # se crea directamente como 'perdido' con prefijo en notas (y no disparamos push).
+    titulo = (fd.get("titulo_homologado") or "").strip().lower()
+    estado = "nuevo"
+    notas_prefix = ""
+    if titulo == "no":
+        estado = "perdido"
+        notas_prefix = "[FILTRADO AUTOMÁTICAMENTE: marcó NO tener título homologado en España] "
+
     return {
         "nombre": nombre or "(Sin nombre)",
         "email": email,
@@ -210,8 +220,8 @@ def meta_to_crm_format(meta_lead, academia):
         "academia": academia,
         "especialidad": especialidad,
         "hora_preferida": hora_pref,
-        "estado": "nuevo",
-        "notas": f"Lead Meta. campaign={meta_lead.get('campaign_id','')}, ad={meta_lead.get('ad_id','')}, lead_id={meta_lead.get('id','')}",
+        "estado": estado,
+        "notas": notas_prefix + f"Lead Meta. campaign={meta_lead.get('campaign_id','')}, ad={meta_lead.get('ad_id','')}, lead_id={meta_lead.get('id','')}",
     }
 
 
@@ -275,16 +285,21 @@ def main():
                 # Lead totalmente nuevo
                 ok, msg = crm_create_lead(crm_cookies, crm_data)
                 if ok:
-                    print(f"    [ok]  {crm_data['nombre']} ({crm_data['telefono']}) -- {crm_data['especialidad']}")
+                    if crm_data.get("estado") == "perdido":
+                        print(f"    [filtered] {crm_data['nombre']} ({crm_data['telefono']}) — sin título homologado")
+                    else:
+                        print(f"    [ok]  {crm_data['nombre']} ({crm_data['telefono']}) -- {crm_data['especialidad']}")
                     total_new += 1
-                    body = (
-                        f"{crm_data['nombre']}\n"
-                        f"Tel: {crm_data['telefono']}\n"
-                        f"Esp: {crm_data['especialidad']}"
-                    )
-                    if crm_data.get("hora_preferida"):
-                        body += f"\nHora pref: {crm_data['hora_preferida']}"
-                    ntfy_send(academia, f"Nuevo lead {academia}", body)
+                    # Solo notificamos por push si el lead NO está filtrado
+                    if crm_data.get("estado") != "perdido":
+                        body = (
+                            f"{crm_data['nombre']}\n"
+                            f"Tel: {crm_data['telefono']}\n"
+                            f"Esp: {crm_data['especialidad']}"
+                        )
+                        if crm_data.get("hora_preferida"):
+                            body += f"\nHora pref: {crm_data['hora_preferida']}"
+                        ntfy_send(academia, f"Nuevo lead {academia}", body)
                 else:
                     print(f"    [err] {msg}")
                     total_err += 1
