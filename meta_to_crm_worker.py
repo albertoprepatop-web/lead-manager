@@ -16,12 +16,15 @@ Variables de entorno:
   CRM_CODE             — Código de acceso del CRM
   META_PAGE_TOKEN      — Page access token de Andalucia (nunca caduca)
   META_PAGE_TOKEN_SEC  — Page access token de Preparasecundaria (nunca caduca)
+  META_PAGE_TOKEN_PT   — Page access token de PrepaTop Madrid (nunca caduca)
   FORM_ACADEMIA_MAP    — JSON. Ej:
                          {"1724817935180111":"PREPARAANDALUCIA",
-                          "1310750974523839":"PREPARASECUNDARIA"}
+                          "1310750974523839":"PREPARASECUNDARIA",
+                          "1334446744984207":"PREPATOP"}
   NTFY_BY_ACADEMIA     — JSON. Ej:
                          {"PREPARAANDALUCIA":"topic-alberto",
-                          "PREPARASECUNDARIA":"topic-diego"}
+                          "PREPARASECUNDARIA":"topic-diego",
+                          "PREPATOP":"topic-alberto"}
 """
 import datetime
 import json
@@ -37,6 +40,7 @@ CRM_URL = os.environ.get("CRM_URL", "https://empathetic-strength-production-53db
 CRM_CODE = os.environ.get("CRM_CODE", "")
 PAGE_TOKEN_AND = os.environ.get("META_PAGE_TOKEN", "")
 PAGE_TOKEN_SEC = os.environ.get("META_PAGE_TOKEN_SEC", "")
+PAGE_TOKEN_PT = os.environ.get("META_PAGE_TOKEN_PT", "")
 FORM_ACADEMIA_MAP = json.loads(os.environ.get("FORM_ACADEMIA_MAP", "{}"))
 NTFY_BY_ACADEMIA = json.loads(os.environ.get("NTFY_BY_ACADEMIA", "{}"))
 STATE_FILE = Path(os.environ.get("STATE_FILE", "/tmp/meta_crm_state.json"))
@@ -48,6 +52,7 @@ RECONTACT_COOLDOWN_SECONDS = 24 * 3600
 TOKEN_BY_ACADEMIA = {
     "PREPARAANDALUCIA": PAGE_TOKEN_AND,
     "PREPARASECUNDARIA": PAGE_TOKEN_SEC,
+    "PREPATOP": PAGE_TOKEN_PT,
 }
 
 SPECIALTY_MAPS = {
@@ -67,6 +72,24 @@ SPECIALTY_MAPS = {
         "ingles": "Inglés",
         "educacion_fisica": "EF",
     },
+    # Form PT_2026_07_FORM_v2_SIN_FRICCION (Madrid) usa keys cortas
+    "PREPATOP": {
+        "infantil": "Infantil",
+        "primaria": "Primaria",
+        "pt": "PT",
+        "al": "AL",
+        "ef": "EF",
+    },
+}
+
+# Valores legibles para la hora preferida cuando el form usa opciones cerradas
+# (el form de Madrid devuelve la key de la opción: manana/tarde/cualquiera)
+HORA_LABELS = {
+    "manana": "Por la mañana",
+    "mañana": "Por la mañana",
+    "tarde": "Por la tarde",
+    "noche": "Por la noche",
+    "cualquiera": "Cualquier hora",
 }
 
 
@@ -166,16 +189,19 @@ def extract_hora_preferida(field_data_dict):
     candidates = [
         # Reales de Meta vistos en formularios actuales
         "call_time",                # PA_2026_06_FORM_v4_NOINGLES: "¿A qué hora podemos llamarte?"
+        "¿cuándo_te_llamamos?",     # PT_2026_07_FORM_v2_SIN_FRICCION (Madrid)
         # Otras variantes habituales
         "hora_preferida", "hora_preferente", "horario", "horario_preferido",
         "best_time_to_call", "preferred_time", "mejor_hora",
         "cuando_te_puedo_llamar", "cuando_te_viene_bien", "cuando_podemos_llamarte",
         "a_que_hora_podemos_llamarte", "a_que_hora_te_puedo_llamar",
+        "cuando_te_llamamos",
     ]
     for key in candidates:
         v = field_data_dict.get(key)
         if v:
-            return v.strip()
+            v = v.strip()
+            return HORA_LABELS.get(v.lower(), v)
     return ""
 
 
@@ -200,7 +226,12 @@ def meta_to_crm_format(meta_lead, academia):
         telefono = "+34" + telefono
     elif telefono and telefono.startswith("34") and len(telefono) == 11:
         telefono = "+" + telefono
-    esp_raw = (fd.get("specialty") or fd.get("cual_es_tu_especialidad") or "").strip().lower()
+    esp_raw = (
+        fd.get("specialty")
+        or fd.get("cual_es_tu_especialidad")
+        or fd.get("¿cuál_es_tu_especialidad?")  # form Madrid (keys en español)
+        or ""
+    ).strip().lower()
     especialidad = SPECIALTY_MAPS.get(academia, {}).get(esp_raw, esp_raw or "")
     hora_pref = extract_hora_preferida(fd)
 
