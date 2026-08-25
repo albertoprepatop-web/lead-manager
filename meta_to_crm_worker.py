@@ -243,6 +243,13 @@ def meta_to_crm_format(meta_lead, academia):
     if titulo == "no":
         estado = "perdido"
         notas_prefix = "[FILTRADO AUTOMÁTICAMENTE: marcó NO tener título homologado en España] "
+    # Filtro automático: especialidad marcada pero que NO ofertamos (p. ej. la
+    # opción "Otra oposición" del formulario, o un form mal mapeado). Se crea
+    # como 'perdido' sin push: solo preparamos oposiciones de maestros.
+    elif esp_raw and esp_raw not in SPECIALTY_MAPS.get(academia, {}):
+        estado = "perdido"
+        notas_prefix = (f"[FILTRADO AUTOMÁTICAMENTE: especialidad no ofertada "
+                        f"({esp_raw})] ")
 
     return {
         "nombre": nombre or "(Sin nombre)",
